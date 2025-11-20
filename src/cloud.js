@@ -217,6 +217,61 @@ void main() {
 }
 `;
 
+const smokeVertexShader = `
+uniform float time;
+attribute float size;
+attribute float speed;
+attribute float shift;
+
+varying float vOpacity;
+
+void main() {
+  float t = mod(time * speed + shift, 1.0);
+  
+  // Start at center, move up
+  vec3 pos = position;
+  pos.y += t * 12.0; // Move up
+  
+  // Expand outward slightly as it goes up (cone shape)
+  float expansion = t * 4.0;
+  // Simple radial expansion based on initial position direction
+  vec3 dir = normalize(position + vec3(0.001)); // Avoid zero div
+  pos.x += dir.x * expansion;
+  pos.z += dir.z * expansion;
+  
+  // Turbulence
+  pos.x += sin(time * 2.0 + pos.y) * 0.5;
+  pos.z += cos(time * 1.5 + pos.y) * 0.5;
+
+  vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+  
+  // Scale size by distance
+  gl_PointSize = size * (1.0 + t * 3.0) * (300.0 / -mvPosition.z);
+  gl_Position = projectionMatrix * mvPosition;
+  
+  // Fade in/out
+  vOpacity = smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.6, 1.0, t));
+}
+`;
+
+const smokeFragmentShader = `
+varying float vOpacity;
+
+void main() {
+  // Soft circular particle
+  vec2 uv = gl_PointCoord - 0.5;
+  float d = length(uv);
+  if(d > 0.5) discard;
+  
+  float alpha = 1.0 - smoothstep(0.0, 0.5, d);
+  
+  // Dark thick smoke color
+  vec3 color = vec3(0.15, 0.15, 0.18); 
+  
+  gl_FragColor = vec4(color, alpha * vOpacity * 0.6);
+}
+`;
+
 export class CloudScene {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
@@ -250,6 +305,7 @@ export class CloudScene {
     this.clock = new THREE.Clock();
 
     this.initCloud();
+    this.initSmoke();
     this.animate();
 
     window.addEventListener('resize', this.onResize.bind(this));
@@ -277,6 +333,54 @@ export class CloudScene {
     this.scene.add(this.cloudMesh);
   }
 
+  initSmoke() {
+    const particleCount = 800;
+    const geometry = new THREE.BufferGeometry();
+
+    const positions = [];
+    const sizes = [];
+    const speeds = [];
+    const shifts = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      // Spawn in small core area
+      const r = Math.random() * 1.5;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+
+      positions.push(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.cos(phi) * 0.5, // Flattened sphere
+        r * Math.sin(phi) * Math.sin(theta)
+      );
+
+      sizes.push(Math.random() * 5.0 + 3.0); // Large particles
+      speeds.push(Math.random() * 0.2 + 0.1);
+      shifts.push(Math.random());
+    }
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+    geometry.setAttribute('speed', new THREE.Float32BufferAttribute(speeds, 1));
+    geometry.setAttribute('shift', new THREE.Float32BufferAttribute(shifts, 1));
+
+    this.smokeUniforms = {
+      time: { value: 0.0 }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: this.smokeUniforms,
+      vertexShader: smokeVertexShader,
+      fragmentShader: smokeFragmentShader,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending
+    });
+
+    this.smokePoints = new THREE.Points(geometry, material);
+    this.scene.add(this.smokePoints);
+  }
+
   animate() {
     requestAnimationFrame(this.animate.bind(this));
 
@@ -284,6 +388,9 @@ export class CloudScene {
 
     if (this.uniforms) {
       this.uniforms.time.value += delta;
+    }
+    if (this.smokeUniforms) {
+      this.smokeUniforms.time.value += delta;
     }
 
     this.controls.update();
