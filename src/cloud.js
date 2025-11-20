@@ -107,8 +107,8 @@ void main() {
   vUv = uv;
   vNormal = normal;
 
-  // Fluid-like displacement: slower, more rolling
-  float t = time * 0.2;
+  // Fluid-like displacement: faster flow
+  float t = time * 0.5;
   
   // Base shape
   float noise1 = cnoise(position * 0.5 + vec3(t));
@@ -160,7 +160,7 @@ void main() {
   // 1. FLUID TEXTURE via Domain Warping
   vec3 q, r;
   vec3 p = vPos * 0.1; // Scale coordinate
-  p += vec3(time * 0.05); // Flow
+  p += vec3(time * 0.2); // Flow
   
   float f = pattern(p, q, r);
   
@@ -257,11 +257,12 @@ export class CloudScene {
 
   initCloud() {
     // High resolution geometry for smooth displacement
-    const geometry = new THREE.IcosahedronGeometry(10, 20); // Increased detail
+    // Reduced size to 30% (10 -> 3) and detail (20 -> 6) for performance
+    const geometry = new THREE.IcosahedronGeometry(3, 6);
 
     this.uniforms = {
       time: { value: 0.0 },
-      displacementStrength: { value: 2.0 },
+      displacementStrength: { value: 0.6 }, // Scaled down displacement
     };
 
     const material = new THREE.ShaderMaterial({
