@@ -95,6 +95,7 @@ ${noiseGLSL}
 varying vec2 vUv;
 varying float vNoise;
 varying vec3 vNormal;
+varying vec3 vPos;
 
 uniform float time;
 uniform float displacementStrength;
@@ -104,18 +105,20 @@ void main() {
   vUv = uv;
   vNormal = normal;
 
-  // Add time to the noise lookup to make it move ("billow")
-  float noiseVal = turbulence(normal * noiseScale + time * 0.1);
+  // Increased time speed for more "surging" feel
+  float noiseVal = turbulence(normal * noiseScale + time * 0.2);
   
-  // Secondary low-frequency noise for general shape distortion
-  float b = 5.0 * cnoise(0.05 * position + vec3(time * 0.2));
+  // Deeper, more dramatic low-frequency shape
+  float b = 8.0 * cnoise(0.03 * position + vec3(time * 0.3));
   
-  // Combine
-  float displacement = -10.0 * noiseVal + b;
+  // Combine with higher amplitude
+  float displacement = -15.0 * noiseVal + b;
   
   vNoise = noiseVal;
   
   vec3 newPosition = position + normal * (displacement * displacementStrength);
+  vPos = newPosition; // Pass to fragment for 3D noise
+  
   gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
 }
 `;
@@ -126,41 +129,64 @@ ${noiseGLSL}
 varying vec2 vUv;
 varying float vNoise;
 varying vec3 vNormal;
+varying vec3 vPos;
 
 uniform float time;
 
-void main() {
-  // Base colors for the "dark green-brown" look
-  vec3 colorDeep = vec3(0.1, 0.05, 0.0); // Dark Brown/Black
-  vec3 colorMid = vec3(0.15, 0.25, 0.05); // Muddy Green
-  vec3 colorHigh = vec3(0.2, 0.3, 0.1); // Lighter Green highlight
+// Fractal Brownian Motion for lightning details
+float fbm(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  float frequency = 0.0;
+  for (int i = 0; i < 5; i++) {
+    value += amplitude * abs(cnoise(p));
+    p *= 2.0;
+    amplitude *= 0.5;
+  }
+  return value;
+}
 
-  // Mix based on noise value from vertex shader
+void main() {
+  // Darker, richer base colors
+  vec3 colorDeep = vec3(0.05, 0.02, 0.0); 
+  vec3 colorMid = vec3(0.1, 0.15, 0.02); 
+  vec3 colorHigh = vec3(0.15, 0.25, 0.05); 
+
   float n = smoothstep(-1.0, 1.0, vNoise);
   vec3 cloudColor = mix(colorDeep, colorMid, n);
   cloudColor = mix(cloudColor, colorHigh, pow(n, 3.0));
 
-  // Static Electricity Effect
-  // High frequency noise for sparks
-  float electricNoise = cnoise(vNormal * 10.0 + time * 5.0);
+  // --- UPGRADED STATIC ELECTRICITY ---
   
-  // Create sharp veins
-  float spark = 1.0 - abs(electricNoise);
-  spark = pow(spark, 10.0); // Sharpen
-  spark = step(0.95, spark); // Threshold
+  // 1. Dynamic "Plasma" Noise
+  // Use domain warping to create jagged, lightning-like patterns
+  vec3 lightningPos = vPos * 0.2 + vec3(time * 0.5);
+  float lightningNoise = fbm(lightningPos);
   
-  // Intermittent flashing
-  float flash = step(0.8, sin(time * 10.0 + vNormal.y * 10.0)); 
+  // 2. Sharp Veins
+  // Invert and sharpen to get thin lines
+  float veins = 1.0 / (abs(lightningNoise * 10.0 - 5.0) + 0.1);
+  veins = pow(veins, 3.0); // Increase contrast
   
-  vec3 electricColor = vec3(0.8, 1.0, 0.9) * spark * flash * 2.0;
+  // 3. Intermittent Flashing
+  // Random flashes based on time and position
+  float flash = step(0.98, fract(sin(dot(vPos.xy, vec2(12.9898, 78.233)) + time) * 43758.5453));
+  float pulse = sin(time * 20.0) * 0.5 + 0.5;
+  
+  // 4. Combine for Electric Glow
+  vec3 electricColor = vec3(0.6, 0.9, 1.0); // Blue-white electricity
+  vec3 spark = electricColor * veins * (0.5 + flash * 5.0) * pulse;
+  
+  // Mask sparks to appear mostly in "deep" crevices or active areas
+  spark *= smoothstep(0.2, 0.8, vNoise);
 
-  // Rim lighting for volume feel
-  vec3 viewDir = vec3(0.0, 0.0, 1.0); // Simplified view direction
+  // Rim lighting
+  vec3 viewDir = vec3(0.0, 0.0, 1.0);
   float rim = 1.0 - max(dot(vNormal, viewDir), 0.0);
-  rim = pow(rim, 2.0);
-  vec3 rimColor = vec3(0.1, 0.2, 0.1) * rim * 0.5;
+  rim = pow(rim, 3.0);
+  vec3 rimColor = vec3(0.05, 0.1, 0.05) * rim;
 
-  gl_FragColor = vec4(cloudColor + electricColor + rimColor, 1.0);
+  gl_FragColor = vec4(cloudColor + spark + rimColor, 1.0);
 }
 `;
 
@@ -176,11 +202,14 @@ export class CloudScene {
 
     this.scene = new THREE.Scene();
 
+    // 1. Very dark gray background
+    this.scene.background = new THREE.Color(0x050505);
+
     // Camera setup
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 1000);
     this.camera.position.set(0, 0, 40);
 
-    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ alpha: false, antialias: true });
     this.renderer.setSize(this.width, this.height);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.container.appendChild(this.renderer.domElement);
@@ -189,7 +218,7 @@ export class CloudScene {
     this.controls.enableDamping = true;
     this.controls.enableZoom = false;
     this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.5;
+    this.controls.autoRotateSpeed = 0.8; // Slightly faster rotation
 
     this.clock = new THREE.Clock();
 
@@ -200,13 +229,13 @@ export class CloudScene {
   }
 
   initCloud() {
-    // High resolution geometry for good displacement
-    const geometry = new THREE.IcosahedronGeometry(10, 5);
+    // High resolution geometry
+    const geometry = new THREE.IcosahedronGeometry(10, 6); // Increased subdivision for smoother spikes
 
     this.uniforms = {
       time: { value: 0.0 },
-      displacementStrength: { value: 0.5 },
-      noiseScale: { value: 2.0 }
+      displacementStrength: { value: 2.5 }, // 2. Higher and deeper surging
+      noiseScale: { value: 2.5 }
     };
 
     const material = new THREE.ShaderMaterial({
