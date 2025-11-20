@@ -8,15 +8,44 @@
   <title>PoopBin.click</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="./src/style.css" />
+</head>
 
-  <button id="dump-btn">
-    <span class="btn-text">감정 배설</span>
-  </button>
+<body>
+  <div id="app">
+    <nav id="navbar">
+      <div class="nav-title">POOPBIN</div>
+      <div class="nav-buttons">
+        <button id="btn-cloud" class="icon-btn" title="Cloud Skin">
+          <img src="/icons/cloud.png" alt="Cloud" />
+        </button>
+        <button id="btn-stats" class="icon-btn" title="Statistics">
+          <img src="/icons/stats.png" alt="Stats" />
+        </button>
+        <button id="btn-rocket" class="icon-btn" title="Space Journey">
+          <img src="/icons/rocket.png" alt="Rocket" />
+        </button>
+        <button id="btn-info" class="icon-btn" title="Info">
+          <img src="/icons/info.png" alt="Info" />
+        </button>
+        <button id="btn-youtube" class="icon-btn" title="YouTube">
+          <img src="/icons/youtube.png" alt="YouTube" />
+        </button>
+      </div>
+    </nav>
 
-  <div id="global-counter-container">
-    국가 총 배설: <span id="global-counter">Loading...</span>
-  </div>
-  </div>
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+      <div id="local-counter" class="counter">0</div>
+
+      <button id="dump-btn">
+        <span class="btn-text">감정 배설</span>
+      </button>
+
+      <div id="global-counter-container">
+        국가 총 배설: <span id="global-counter">Loading...</span>
+      </div>
+    </div>
   </div>
   <script>
     if ('serviceWorker' in navigator) {
@@ -32,6 +61,6 @@
     }
   </script>
   <script type="module" src="./src/main.js"></script>
-  </body>
+</body>
 
 </html>
