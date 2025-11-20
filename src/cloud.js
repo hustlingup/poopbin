@@ -218,6 +218,7 @@ void main() {
 `;
 
 const smokeVertexShader = `
+${noiseGLSL}
 uniform float time;
 attribute float size;
 attribute float speed;
@@ -228,29 +229,38 @@ varying float vOpacity;
 void main() {
   float t = mod(time * speed + shift, 1.0);
   
-  // Start at center, move up
+  // Initial position on surface
   vec3 pos = position;
-  pos.y += t * 12.0; // Move up
   
-  // Expand outward slightly as it goes up (cone shape)
-  float expansion = t * 4.0;
-  // Simple radial expansion based on initial position direction
-  vec3 dir = normalize(position + vec3(0.001)); // Avoid zero div
-  pos.x += dir.x * expansion;
-  pos.z += dir.z * expansion;
+  // Calculate normal (approximate for sphere)
+  vec3 normal = normalize(pos);
   
-  // Turbulence
-  pos.x += sin(time * 2.0 + pos.y) * 0.5;
-  pos.z += cos(time * 1.5 + pos.y) * 0.5;
+  // "Endless" feel: Particles flow along the surface and expand slightly
+  // We use noise to create a turbulent flow around the surface
+  
+  // 1. Slight outward expansion over life
+  pos += normal * (t * 0.8);
+  
+  // 2. Surface flow / Turbulence
+  // Use noise to displace position, creating a "billowing" effect
+  float noiseScale = 0.5;
+  float timeScale = time * 0.5;
+  
+  vec3 noisePos = pos * noiseScale + vec3(timeScale);
+  
+  // Add curl-like noise (using derivatives of noise would be better but simple noise offset works for smoke)
+  pos.x += cnoise(noisePos) * 1.0;
+  pos.y += cnoise(noisePos + vec3(10.0)) * 1.0;
+  pos.z += cnoise(noisePos + vec3(20.0)) * 1.0;
 
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   
-  // Scale size by distance
-  gl_PointSize = size * (1.0 + t * 3.0) * (300.0 / -mvPosition.z);
+  // Scale size by distance and life
+  gl_PointSize = size * (1.0 + t * 0.5) * (300.0 / -mvPosition.z);
   gl_Position = projectionMatrix * mvPosition;
   
-  // Fade in/out
-  vOpacity = smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.6, 1.0, t));
+  // Fade in and out smoothly to create endless loop feel
+  vOpacity = smoothstep(0.0, 0.2, t) * (1.0 - smoothstep(0.6, 1.0, t));
 }
 `;
 
@@ -265,10 +275,10 @@ void main() {
   
   float alpha = 1.0 - smoothstep(0.0, 0.5, d);
   
-  // Dark thick smoke color
-  vec3 color = vec3(0.15, 0.15, 0.18); 
+  // Smoke color - slightly lighter than background for contrast
+  vec3 color = vec3(0.6, 0.6, 0.65); 
   
-  gl_FragColor = vec4(color, alpha * vOpacity * 0.6);
+  gl_FragColor = vec4(color, alpha * vOpacity * 0.3);
 }
 `;
 
@@ -334,7 +344,7 @@ export class CloudScene {
   }
 
   initSmoke() {
-    const particleCount = 800;
+    const particleCount = 1500; // Increased count for denser surface smoke
     const geometry = new THREE.BufferGeometry();
 
     const positions = [];
@@ -343,19 +353,22 @@ export class CloudScene {
     const shifts = [];
 
     for (let i = 0; i < particleCount; i++) {
-      // Spawn in small core area
-      const r = Math.random() * 1.5;
+      // Spawn ON SURFACE of the cloud (radius ~3)
+      // We want them to cover the surface
+      const r = 3.0 + Math.random() * 0.5; // Surface + slight offset
+
+      // Uniform distribution on sphere
       const theta = Math.random() * Math.PI * 2;
-      const phi = Math.random() * Math.PI;
+      const phi = Math.acos(2 * Math.random() - 1);
 
       positions.push(
         r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi) * 0.5, // Flattened sphere
-        r * Math.sin(phi) * Math.sin(theta)
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
       );
 
-      sizes.push(Math.random() * 5.0 + 3.0); // Large particles
-      speeds.push(Math.random() * 0.2 + 0.1);
+      sizes.push(Math.random() * 4.0 + 2.0); // Varied sizes
+      speeds.push(Math.random() * 0.1 + 0.05); // Slower speed for surface drift
       shifts.push(Math.random());
     }
 
@@ -374,7 +387,7 @@ export class CloudScene {
       fragmentShader: smokeFragmentShader,
       transparent: true,
       depthWrite: false,
-      blending: THREE.NormalBlending
+      blending: THREE.AdditiveBlending // Additive for glowing smoke effect
     });
 
     this.smokePoints = new THREE.Points(geometry, material);
