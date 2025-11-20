@@ -1,9 +1,11 @@
 :root {
-  --bg-color: #f0f0f0; /* Light gray background */
+  --bg-color: #f0f0f0;
+  /* Light gray background */
   --text-color: #333;
   --btn-black: #000;
   --btn-text: #fff;
-  --accent-green: #4a5d23; /* Dark green-brown */
+  --accent-green: #4a5d23;
+  /* Dark green-brown */
   --font-main: 'Inter', sans-serif;
 }
 
@@ -47,8 +49,9 @@ body {
 .nav-title {
   font-size: 2rem;
   font-weight: 900;
-  color: white; /* As per spec */
-  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  color: white;
+  /* As per spec */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   pointer-events: none;
 }
 
@@ -60,11 +63,28 @@ body {
 .icon-btn {
   background: transparent;
   border: none;
-  font-size: 1.5rem;
   cursor: pointer;
-  opacity: 0.8; /* 20% transparent yellow icons - using emoji for now, will style later */
-  filter: sepia(1) hue-rotate(10deg) saturate(5); /* Yellow-ish tint */
+  opacity: 0.8;
   transition: transform 0.1s;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  /* Apply yellow tint filter if desired, or keep original colors. 
+     User spec said "transparent yellow small icon buttons" initially.
+     If these are colored PNGs, we might not want the filter.
+     If they are white/black, we might want it.
+     Let's keep the filter but adjust it to be less aggressive or remove if they are full color.
+     Assuming they are full color PNGs based on names, I will remove the heavy sepia/hue-rotate 
+     and just let them be, or maybe just opacity. 
+     The user said "20% transparent yellow icons" in spec, but now "replace with png".
+     I'll remove the filter for now to show the PNGs clearly. */
 }
 
 .icon-btn:active {
@@ -89,7 +109,8 @@ body {
   width: 100%;
   height: 100%;
   z-index: 10;
-  pointer-events: none; /* Let clicks pass through to canvas if needed, but buttons need pointer-events: auto */
+  pointer-events: none;
+  /* Let clicks pass through to canvas if needed, but buttons need pointer-events: auto */
   display: flex;
   flex-direction: column;
   justify-content: space-between;
