@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-// GLSL Textureless Classic 3D Noise "cnoise"
-// Author: Stefan Gustavson
+// GLSL Simplex Noise
 const noiseGLSL = `
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -78,7 +77,7 @@ float cnoise(vec3 P) {
   return 2.2 * n_xyz;
 }
 
-// FBM for Domain Warping
+// FBM
 float fbm(vec3 x) {
   float v = 0.0;
   float a = 0.5;
@@ -92,58 +91,54 @@ float fbm(vec3 x) {
 }
 `;
 
-const vertexShader = `
+// --- BLOB SHADERS ---
+
+const blobVertexShader = `
 ${noiseGLSL}
+
+uniform float uTime;
+uniform float uDisplacementStrength;
+uniform vec2 uMouse;
 
 varying vec2 vUv;
 varying vec3 vNormal;
 varying vec3 vPos;
-varying float vDisplacement;
-
-uniform float time;
-uniform float displacementStrength;
+varying float vNoise;
 
 void main() {
   vUv = uv;
   vNormal = normal;
 
-  // Fluid-like displacement: faster flow
-  float t = time * 0.5;
+  // 1. Blobby Displacement
+  // Large, slow noise for the "breathing" shape
+  float t = uTime * 0.5;
+  float noise = cnoise(position * 0.8 + vec3(t));
   
-  // Base shape
-  float noise1 = cnoise(position * 0.5 + vec3(t));
+  // Add some mouse interaction (simple push)
+  // float mouseDist = distance(uv, uMouse); // UV based interaction is tricky on sphere, keeping it simple for now
   
-  // Detail shape
-  float noise2 = cnoise(position * 1.5 - vec3(t * 1.5));
+  vec3 newPos = position + normal * (noise * uDisplacementStrength);
   
-  float displacement = (noise1 + noise2 * 0.5) * displacementStrength;
-  
-  vDisplacement = displacement;
-  
-  vec3 newPosition = position + normal * displacement;
-  vPos = newPosition; 
-  
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+  vPos = newPos;
+  vNoise = noise;
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
 }
 `;
 
-const fragmentShader = `
+const blobFragmentShader = `
 ${noiseGLSL}
 
-varying vec2 vUv;
-varying vec3 vNormal;
+uniform float uTime;
 varying vec3 vPos;
-varying float vDisplacement;
+varying float vNoise;
 
-uniform float time;
-
-// Cosine Palette for rich colors
-// Link: http://dev.thi.ng/gradients/
+// Cosine Palette (Slime/Toxic/Neural)
 vec3 palette( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) {
     return a + b*cos( 6.28318*(c*t+d) );
 }
 
-// Domain Warping Pattern
+// Domain Warping Pattern (Neural Noise)
 float pattern( in vec3 p, out vec3 q, out vec3 r ) {
     q.x = fbm( p + vec3(0.0,0.0,0.0) );
     q.y = fbm( p + vec3(5.2,1.3,2.8) );
@@ -157,110 +152,88 @@ float pattern( in vec3 p, out vec3 q, out vec3 r ) {
 }
 
 void main() {
-  // 1. FLUID TEXTURE via Domain Warping
-  vec3 q, r;
-  vec3 p = vPos * 0.1; // Scale coordinate
-  p += vec3(time * 0.2); // Flow
+  // Scale coordinate for texture
+  vec3 p = vPos * 0.5; 
+  p += vec3(uTime * 0.1); // Flow
   
+  vec3 q, r;
   float f = pattern(p, q, r);
   
-  // 2. COLOR PALETTE
-  // We use the warped value 'f' and the intermediate 'q' length to drive color
-  // Palette inspired by iridescent/fluid looks
-  vec3 col = palette(f + length(q), 
+  // Color Palette: Dark Green/Brown/Slime
+  // a, b, c, d
+  vec3 col = palette(f + vNoise * 0.2, 
                      vec3(0.5, 0.5, 0.5), 
                      vec3(0.5, 0.5, 0.5), 
                      vec3(1.0, 1.0, 1.0), 
-                     vec3(0.0, 0.33, 0.67));
+                     vec3(0.0, 0.33, 0.67) // Blue-ish base
+                     );
                      
-  // Mix with a dark base for the "cloud" density
-  vec3 darkBase = vec3(0.1, 0.1, 0.15);
-  col = mix(darkBase, col, smoothstep(0.2, 0.8, f));
+  // Adjust to Slime colors (Green/Yellow/Dark)
+  // Replacing the blue-ish palette with a custom mix
+  vec3 slimeColor1 = vec3(0.1, 0.4, 0.1); // Dark Green
+  vec3 slimeColor2 = vec3(0.6, 0.8, 0.2); // Bright Slime
+  vec3 slimeColor3 = vec3(0.05, 0.1, 0.05); // Very Dark
+  
+  vec3 finalColor = mix(slimeColor3, slimeColor1, smoothstep(0.0, 0.5, f));
+  finalColor = mix(finalColor, slimeColor2, smoothstep(0.5, 1.0, f));
+  
+  // Add some "neural" highlights
+  finalColor += vec3(0.2) * smoothstep(0.4, 0.45, abs(f - 0.5));
 
-  // 3. RANDOM LIGHTS
-  // Procedural lights moving inside
-  vec3 lightColor = vec3(0.0);
-  
-  for(int i = 0; i < 4; i++) {
-      float fi = float(i);
-      // Randomize motion for each light
-      float speed = 0.5 + fi * 0.1;
-      vec3 lightPos = vec3(
-          sin(time * speed + fi * 10.0) * 8.0,
-          cos(time * speed * 0.8 + fi * 23.0) * 8.0,
-          sin(time * speed * 0.5 + fi * 55.0) * 8.0
-      );
-      
-      float dist = distance(vPos, lightPos);
-      
-      // Light falloff
-      float intensity = 1.0 / (1.0 + dist * dist * 0.5);
-      intensity = pow(intensity, 2.0) * 10.0; // Sharpen and boost
-      
-      // Random color for each light
-      vec3 lCol = palette(fi * 0.1 + time * 0.1, 
-                          vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.0, 0.10, 0.20));
-                          
-      lightColor += lCol * intensity;
-  }
-  
-  // Add lights to base color
-  col += lightColor;
-  
-  // 4. RIM LIGHTING for 3D volume feel
-  vec3 viewDir = vec3(0.0, 0.0, 1.0); // Simplified view dir
-  float rim = 1.0 - max(dot(vNormal, viewDir), 0.0);
-  rim = pow(rim, 2.0);
-  col += vec3(0.2, 0.4, 0.6) * rim * 0.5;
+  // Rim light
+  vec3 viewDir = vec3(0.0, 0.0, 1.0);
+  float rim = 1.0 - max(dot(normalize(cross(dFdx(vPos), dFdy(vPos))), viewDir), 0.0);
+  finalColor += vec3(0.4, 0.8, 0.4) * pow(rim, 3.0) * 0.5;
 
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
 
+// --- SMOKE SHADERS ---
+
 const smokeVertexShader = `
 ${noiseGLSL}
-uniform float time;
+
+uniform float uTime;
 attribute float size;
 attribute float speed;
-attribute float shift;
+attribute float offset;
 
 varying float vOpacity;
 
 void main() {
-  float t = mod(time * speed + shift, 1.0);
+  // Time loop for endless effect
+  float t = mod(uTime * speed + offset, 1.0);
   
-  // Initial position on surface
+  // Start on surface (approximate)
   vec3 pos = position;
-  
-  // Calculate normal (approximate for sphere)
   vec3 normal = normalize(pos);
   
-  // "Endless" feel: Particles flow along the surface and expand slightly
-  // We use noise to create a turbulent flow around the surface
+  // Move outward and upward/swirl
+  // Fluid-like motion using noise
   
-  // 1. Slight outward expansion over life
-  pos += normal * (t * 0.8);
+  // 1. Outward expansion
+  float expansion = t * 4.0; // Move far out
+  pos += normal * expansion;
   
-  // 2. Surface flow / Turbulence
-  // Use noise to displace position, creating a "billowing" effect
+  // 2. Turbulence/Swirl
   float noiseScale = 0.5;
-  float timeScale = time * 0.5;
+  vec3 noisePos = pos * noiseScale + vec3(uTime * 0.5);
   
-  vec3 noisePos = pos * noiseScale + vec3(timeScale);
+  vec3 turbulence;
+  turbulence.x = cnoise(noisePos);
+  turbulence.y = cnoise(noisePos + vec3(100.0));
+  turbulence.z = cnoise(noisePos + vec3(200.0));
   
-  // Add curl-like noise (using derivatives of noise would be better but simple noise offset works for smoke)
-  pos.x += cnoise(noisePos) * 1.0;
-  pos.y += cnoise(noisePos + vec3(10.0)) * 1.0;
-  pos.z += cnoise(noisePos + vec3(20.0)) * 1.0;
-
+  pos += turbulence * t * 2.0; // Turbulence increases with distance/time
+  
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   
-  // Scale size by distance and life
-  gl_PointSize = size * (1.0 + t * 0.5) * (300.0 / -mvPosition.z);
+  gl_PointSize = size * (1.0 + t) * (300.0 / -mvPosition.z);
   gl_Position = projectionMatrix * mvPosition;
   
-  // Fade in and out smoothly to create endless loop feel
-  vOpacity = smoothstep(0.0, 0.2, t) * (1.0 - smoothstep(0.6, 1.0, t));
+  // Fade in/out
+  vOpacity = smoothstep(0.0, 0.1, t) * (1.0 - smoothstep(0.6, 1.0, t));
 }
 `;
 
@@ -268,17 +241,17 @@ const smokeFragmentShader = `
 varying float vOpacity;
 
 void main() {
-  // Soft circular particle
+  // Soft particle
   vec2 uv = gl_PointCoord - 0.5;
   float d = length(uv);
   if(d > 0.5) discard;
   
   float alpha = 1.0 - smoothstep(0.0, 0.5, d);
   
-  // Smoke color - slightly lighter than background for contrast
-  vec3 color = vec3(0.6, 0.6, 0.65); 
+  // Thick fluid color (matching blob)
+  vec3 color = vec3(0.2, 0.5, 0.2); 
   
-  gl_FragColor = vec4(color, alpha * vOpacity * 0.3);
+  gl_FragColor = vec4(color, alpha * vOpacity * 0.6);
 }
 `;
 
@@ -293,13 +266,10 @@ export class CloudScene {
     this.height = this.container.clientHeight;
 
     this.scene = new THREE.Scene();
+    this.scene.background = null; // Transparent
 
-    // Transparent background to let CSS gradient show
-    this.scene.background = null;
-
-    // Camera setup
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 1000);
-    this.camera.position.set(0, 0, 30);
+    this.camera.position.set(0, 0, 15);
 
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     this.renderer.setSize(this.width, this.height);
@@ -310,54 +280,49 @@ export class CloudScene {
     this.controls.enableDamping = true;
     this.controls.enableZoom = false;
     this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 1.0;
+    this.controls.autoRotateSpeed = 2.0; // Horizontal spin
 
     this.clock = new THREE.Clock();
+    this.mouse = new THREE.Vector2();
 
-    this.initCloud();
+    this.initBlob();
     this.initSmoke();
+    this.addEvents();
     this.animate();
-
-    window.addEventListener('resize', this.onResize.bind(this));
   }
 
-  initCloud() {
-    // High resolution geometry for smooth displacement
-    // Reduced size to 30% (10 -> 3) and detail (20 -> 6) for performance
-    const geometry = new THREE.IcosahedronGeometry(3, 6);
+  initBlob() {
+    // High resolution for smooth displacement
+    const geometry = new THREE.IcosahedronGeometry(3, 30);
 
-    this.uniforms = {
-      time: { value: 0.0 },
-      displacementStrength: { value: 0.6 }, // Scaled down displacement
+    this.blobUniforms = {
+      uTime: { value: 0.0 },
+      uDisplacementStrength: { value: 1.2 },
+      uMouse: { value: new THREE.Vector2(0, 0) }
     };
 
     const material = new THREE.ShaderMaterial({
-      uniforms: this.uniforms,
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-      wireframe: false,
+      uniforms: this.blobUniforms,
+      vertexShader: blobVertexShader,
+      fragmentShader: blobFragmentShader,
       side: THREE.DoubleSide
     });
 
-    this.cloudMesh = new THREE.Mesh(geometry, material);
-    this.scene.add(this.cloudMesh);
+    this.blob = new THREE.Mesh(geometry, material);
+    this.scene.add(this.blob);
   }
 
   initSmoke() {
-    const particleCount = 1500; // Increased count for denser surface smoke
+    const particleCount = 2000;
     const geometry = new THREE.BufferGeometry();
-
     const positions = [];
     const sizes = [];
     const speeds = [];
-    const shifts = [];
+    const offsets = [];
 
     for (let i = 0; i < particleCount; i++) {
-      // Spawn ON SURFACE of the cloud (radius ~3)
-      // We want them to cover the surface
-      const r = 3.0 + Math.random() * 0.5; // Surface + slight offset
-
-      // Uniform distribution on sphere
+      // Spawn on surface of radius ~3
+      const r = 3.0;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
 
@@ -367,18 +332,18 @@ export class CloudScene {
         r * Math.cos(phi)
       );
 
-      sizes.push(Math.random() * 4.0 + 2.0); // Varied sizes
-      speeds.push(Math.random() * 0.1 + 0.05); // Slower speed for surface drift
-      shifts.push(Math.random());
+      sizes.push(Math.random() * 5.0 + 2.0);
+      speeds.push(Math.random() * 0.2 + 0.1);
+      offsets.push(Math.random());
     }
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
     geometry.setAttribute('speed', new THREE.Float32BufferAttribute(speeds, 1));
-    geometry.setAttribute('shift', new THREE.Float32BufferAttribute(shifts, 1));
+    geometry.setAttribute('offset', new THREE.Float32BufferAttribute(offsets, 1));
 
     this.smokeUniforms = {
-      time: { value: 0.0 }
+      uTime: { value: 0.0 }
     };
 
     const material = new THREE.ShaderMaterial({
@@ -387,27 +352,26 @@ export class CloudScene {
       fragmentShader: smokeFragmentShader,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending // Additive for glowing smoke effect
+      blending: THREE.NormalBlending // Normal blending for "thick" look, Additive for "glowing"
     });
 
-    this.smokePoints = new THREE.Points(geometry, material);
-    this.scene.add(this.smokePoints);
+    this.smoke = new THREE.Points(geometry, material);
+    this.scene.add(this.smoke);
   }
 
-  animate() {
-    requestAnimationFrame(this.animate.bind(this));
+  addEvents() {
+    window.addEventListener('resize', this.onResize.bind(this));
+    window.addEventListener('mousemove', this.onMouseMove.bind(this));
+  }
 
-    const delta = this.clock.getDelta();
+  onMouseMove(event) {
+    // Normalize mouse position -1 to 1
+    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    if (this.uniforms) {
-      this.uniforms.time.value += delta;
+    if (this.blobUniforms) {
+      this.blobUniforms.uMouse.value.copy(this.mouse);
     }
-    if (this.smokeUniforms) {
-      this.smokeUniforms.time.value += delta;
-    }
-
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
   }
 
   onResize() {
@@ -417,5 +381,22 @@ export class CloudScene {
     this.camera.aspect = this.width / this.height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.width, this.height);
+  }
+
+  animate() {
+    requestAnimationFrame(this.animate.bind(this));
+
+    const delta = this.clock.getDelta();
+    const time = this.clock.getElapsedTime();
+
+    if (this.blobUniforms) {
+      this.blobUniforms.uTime.value = time;
+    }
+    if (this.smokeUniforms) {
+      this.smokeUniforms.uTime.value = time;
+    }
+
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
   }
 }
