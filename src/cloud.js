@@ -20,9 +20,25 @@ export class CloudScene {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.enableZoom = false; // Disable zoom to keep layout stable? User didn't specify, but usually good for background.
+    this.controls.enableZoom = false;
 
     this.initCloud();
+    this.animate();
+
+    window.addEventListener('resize', this.onResize.bind(this));
+  }
+
+  initCloud() {
+    // Load the smoke texture
+    const texLoader = new THREE.TextureLoader();
+    const smokeTex = texLoader.load("/textures/1-1.png");
+
+    smokeTex.wrapS = smokeTex.wrapT = THREE.ClampToEdgeWrapping;
+    smokeTex.minFilter = THREE.LinearFilter;
+
+    this.smokeGroup = new THREE.Group();
+    this.scene.add(this.smokeGroup);
+
     const layerCount = 6;
     for (let i = 0; i < layerCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
