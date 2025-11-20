@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 export class CloudScene {
   constructor(containerId) {
@@ -7,95 +8,79 @@ export class CloudScene {
     this.height = this.container.clientHeight;
 
     this.scene = new THREE.Scene();
-    // Background is handled by CSS, so we keep scene transparent or match color
-    // Spec says "Light gray (fixed)" background, which is in CSS.
-    // Three.js canvas should be transparent to show CSS background? 
-    // Or we set scene background. Let's set scene background to null (transparent)
-    // so CSS background shows through.
-    
-    this.camera = new THREE.PerspectiveCamera(75, this.width / this.height, 0.1, 1000);
-    this.camera.position.z = 5;
+    // Keeping background transparent to match app style (CSS handles background)
+    // this.scene.background = new THREE.Color(0x111111); 
+
+    this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 100);
+    this.camera.position.set(0, 0, 5);
 
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     this.renderer.setSize(this.width, this.height);
     this.container.appendChild(this.renderer.domElement);
 
-    this.initLights();
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.enableZoom = false; // Disable zoom to keep layout stable? User didn't specify, but usually good for background.
+
     this.initCloud();
     this.animate();
 
     window.addEventListener('resize', this.onResize.bind(this));
   }
 
-  initLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    this.scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(5, 5, 5);
-    this.scene.add(directionalLight);
-  }
-
   initCloud() {
-    // Placeholder for "Alive weightless dark green-brown cloud"
-    // Using a group of spheres to look like a cloud clump
-    this.cloudGroup = new THREE.Group();
+    // Generate a procedural smoke texture since "/mnt/data/1-1.png" is not available
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
 
-    const geometry = new THREE.IcosahedronGeometry(1, 1); // Low poly look or high? Spec says "billowing", maybe smooth.
-    // Let's use a StandardMaterial with the requested color
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x4a5d23, // Dark green-brown
-      roughness: 0.4,
-      metalness: 0.1,
-      flatShading: true // Low poly aesthetic might fit "billowing" if animated well, or we can smooth it.
-    });
+    // Soft radial gradient for smoke puff
+    const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.5)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-    // Create a few blobs to form a cloud shape
-    const positions = [
-      { x: 0, y: 0, z: 0, s: 1.5 },
-      { x: 1, y: 0.2, z: 0.1, s: 1.0 },
-      { x: -1, y: -0.1, z: 0.2, s: 1.1 },
-      { x: 0.5, y: 0.8, z: -0.2, s: 0.9 },
-      { x: -0.4, y: -0.7, z: 0.1, s: 0.8 },
-      { x: 0, y: 0, z: 1, s: 0.9 },
-      { x: 0, y: 0, z: -1, s: 0.9 }
-    ];
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
 
-    positions.forEach(pos => {
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(pos.x, pos.y, pos.z);
-      mesh.scale.set(pos.s, pos.s, pos.s);
-      this.cloudGroup.add(mesh);
-    });
+    const smokeTex = new THREE.CanvasTexture(canvas);
+    smokeTex.wrapS = smokeTex.wrapT = THREE.ClampToEdgeWrapping;
+    smokeTex.minFilter = THREE.LinearFilter;
 
-    this.scene.add(this.cloudGroup);
-  }
+    this.smokeGroup = new THREE.Group();
+    this.scene.add(this.smokeGroup);
 
-  grow(scaleFactor) {
-    // Target scale based on clicks
-    // We will tween this in the main loop or using GSAP
-    // For now, just direct set or use a method to animate to target
-    // this.cloudGroup.scale.setScalar(scaleFactor);
+    const layerCount = 6;
+    for (let i = 0; i < layerCount; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: smokeTex,
+        color: 0x4a5d23, // Apply the "dark green-brown" from spec
+        transparent: true,
+        depthWrite: false,
+        opacity: 0.25,
+        side: THREE.DoubleSide
+      });
+
+      const geo = new THREE.PlaneGeometry(3, 4);
+      const mesh = new THREE.Mesh(geo, mat);
+
+      mesh.position.z = i * -0.1;
+      mesh.rotation.z = (Math.random() - 0.5) * 0.4;
+
+      this.smokeGroup.add(mesh);
+    }
   }
 
   animate() {
     requestAnimationFrame(this.animate.bind(this));
 
-    // "Slowly spinning"
-    if (this.cloudGroup) {
-      this.cloudGroup.rotation.y += 0.002;
-      this.cloudGroup.rotation.z += 0.001;
-      
-      // "Billowing" - simple scale pulse for now
-      const time = Date.now() * 0.001;
-      this.cloudGroup.children.forEach((child, i) => {
-        const offset = i * 0.5;
-        const scaleBase = child.userData.originalScale || child.scale.x; // Store original scale if needed
-        // Simple breathing
-        // child.scale.setScalar(scaleBase + Math.sin(time + offset) * 0.05);
-      });
+    if (this.smokeGroup) {
+      this.smokeGroup.rotation.y += 0.002;
+      this.smokeGroup.rotation.x += 0.001;
     }
 
+    this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 
