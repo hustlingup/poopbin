@@ -29,29 +29,6 @@
         </button>
         <button id="btn-youtube" class="icon-btn" title="YouTube">
           <img src="/icons/youtube.png" alt="YouTube" />
-        </button>
-      </div>
-    </nav>
-
-    <div id="canvas-container"></div>
-
-    <div id="ui-layer">
-      <div id="local-counter" class="counter">0</div>
-
-      <button id="dump-btn">
-        <span class="btn-text">감정 배설</span>
-      </button>
-
-      <div id="global-counter-container">
-        국가 총 배설: <span id="global-counter">Loading...</span>
-      </div>
-    </div>
-  </div>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(registration => {
             console.log('SW registered: ', registration);
           })
           .catch(registrationError => {
