@@ -78,14 +78,17 @@ float cnoise(vec3 P) {
   return 2.2 * n_xyz;
 }
 
-float turbulence(vec3 p) {
-  float w = 100.0;
-  float t = -0.5;
-  for (float f = 1.0; f <= 10.0; f++) {
-    float power = pow(2.0, f);
-    t += abs(cnoise(vec3(power * p)) / power);
+// FBM for Domain Warping
+float fbm(vec3 x) {
+  float v = 0.0;
+  float a = 0.5;
+  vec3 shift = vec3(100.0);
+  for (int i = 0; i < 5; ++i) {
+    v += a * cnoise(x);
+    x = x * 2.0 + shift;
+    a *= 0.5;
   }
-  return t;
+  return v;
 }
 `;
 
@@ -93,31 +96,32 @@ const vertexShader = `
 ${noiseGLSL}
 
 varying vec2 vUv;
-varying float vNoise;
 varying vec3 vNormal;
 varying vec3 vPos;
+varying float vDisplacement;
 
 uniform float time;
 uniform float displacementStrength;
-uniform float noiseScale;
 
 void main() {
   vUv = uv;
   vNormal = normal;
 
-  // Increased time speed for more "surging" feel
-  float noiseVal = turbulence(normal * noiseScale + time * 0.2);
+  // Fluid-like displacement: slower, more rolling
+  float t = time * 0.2;
   
-  // Deeper, more dramatic low-frequency shape
-  float b = 8.0 * cnoise(0.03 * position + vec3(time * 0.3));
+  // Base shape
+  float noise1 = cnoise(position * 0.5 + vec3(t));
   
-  // Combine with higher amplitude
-  float displacement = -15.0 * noiseVal + b;
+  // Detail shape
+  float noise2 = cnoise(position * 1.5 - vec3(t * 1.5));
   
-  vNoise = noiseVal;
+  float displacement = (noise1 + noise2 * 0.5) * displacementStrength;
   
-  vec3 newPosition = position + normal * (displacement * displacementStrength);
-  vPos = newPosition; // Pass to fragment for 3D noise
+  vDisplacement = displacement;
+  
+  vec3 newPosition = position + normal * displacement;
+  vPos = newPosition; 
   
   gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
 }
@@ -127,63 +131,89 @@ const fragmentShader = `
 ${noiseGLSL}
 
 varying vec2 vUv;
-varying float vNoise;
 varying vec3 vNormal;
 varying vec3 vPos;
+varying float vDisplacement;
 
 uniform float time;
 
-// Fractal Brownian Motion for lightning details
-float fbm(vec3 p) {
-  float value = 0.0;
-  float amplitude = 0.5;
-  float frequency = 0.0;
-  for (int i = 0; i < 5; i++) {
-    value += amplitude * abs(cnoise(p));
-    p *= 2.0;
-    amplitude *= 0.5;
-  }
-  return value;
+// Cosine Palette for rich colors
+// Link: http://dev.thi.ng/gradients/
+vec3 palette( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) {
+    return a + b*cos( 6.28318*(c*t+d) );
+}
+
+// Domain Warping Pattern
+float pattern( in vec3 p, out vec3 q, out vec3 r ) {
+    q.x = fbm( p + vec3(0.0,0.0,0.0) );
+    q.y = fbm( p + vec3(5.2,1.3,2.8) );
+    q.z = fbm( p + vec3(1.2,3.4,5.6) );
+
+    r.x = fbm( p + 4.0*q + vec3(1.7,9.2,5.2) );
+    r.y = fbm( p + 4.0*q + vec3(8.3,2.8,1.2) );
+    r.z = fbm( p + 4.0*q + vec3(1.2,3.4,5.6) );
+
+    return fbm( p + 4.0*r );
 }
 
 void main() {
-  // Updated colors based on image: Dark Brown/Black mixing with Vibrant Green
-  vec3 colorDeep = vec3(0.05, 0.02, 0.0); // Deep Black/Brown
-  vec3 colorMid = vec3(0.2, 0.15, 0.1); // Brownish
-  vec3 colorHigh = vec3(0.0, 0.8, 0.4); // Vibrant Green (Toxic/Magic look)
+  // 1. FLUID TEXTURE via Domain Warping
+  vec3 q, r;
+  vec3 p = vPos * 0.1; // Scale coordinate
+  p += vec3(time * 0.05); // Flow
+  
+  float f = pattern(p, q, r);
+  
+  // 2. COLOR PALETTE
+  // We use the warped value 'f' and the intermediate 'q' length to drive color
+  // Palette inspired by iridescent/fluid looks
+  vec3 col = palette(f + length(q), 
+                     vec3(0.5, 0.5, 0.5), 
+                     vec3(0.5, 0.5, 0.5), 
+                     vec3(1.0, 1.0, 1.0), 
+                     vec3(0.0, 0.33, 0.67));
+                     
+  // Mix with a dark base for the "cloud" density
+  vec3 darkBase = vec3(0.1, 0.1, 0.15);
+  col = mix(darkBase, col, smoothstep(0.2, 0.8, f));
 
-  float n = smoothstep(-1.0, 1.0, vNoise);
-  vec3 cloudColor = mix(colorDeep, colorMid, n);
-  // Use a sharper mix for the green to make it look like "ink" or "magic"
-  cloudColor = mix(cloudColor, colorHigh, pow(n, 4.0));
-
-  // --- UPGRADED STATIC ELECTRICITY ---
+  // 3. RANDOM LIGHTS
+  // Procedural lights moving inside
+  vec3 lightColor = vec3(0.0);
   
-  // 1. Dynamic "Plasma" Noise
-  vec3 lightningPos = vPos * 0.2 + vec3(time * 0.5);
-  float lightningNoise = fbm(lightningPos);
+  for(int i = 0; i < 4; i++) {
+      float fi = float(i);
+      // Randomize motion for each light
+      float speed = 0.5 + fi * 0.1;
+      vec3 lightPos = vec3(
+          sin(time * speed + fi * 10.0) * 8.0,
+          cos(time * speed * 0.8 + fi * 23.0) * 8.0,
+          sin(time * speed * 0.5 + fi * 55.0) * 8.0
+      );
+      
+      float dist = distance(vPos, lightPos);
+      
+      // Light falloff
+      float intensity = 1.0 / (1.0 + dist * dist * 0.5);
+      intensity = pow(intensity, 2.0) * 10.0; // Sharpen and boost
+      
+      // Random color for each light
+      vec3 lCol = palette(fi * 0.1 + time * 0.1, 
+                          vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.0, 0.10, 0.20));
+                          
+      lightColor += lCol * intensity;
+  }
   
-  // 2. Sharp Veins
-  float veins = 1.0 / (abs(lightningNoise * 10.0 - 5.0) + 0.1);
-  veins = pow(veins, 3.0); 
+  // Add lights to base color
+  col += lightColor;
   
-  // 3. Intermittent Flashing
-  float flash = step(0.98, fract(sin(dot(vPos.xy, vec2(12.9898, 78.233)) + time) * 43758.5453));
-  float pulse = sin(time * 20.0) * 0.5 + 0.5;
-  
-  // 4. Combine for Electric Glow
-  vec3 electricColor = vec3(0.6, 1.0, 0.8); // Greenish-white electricity
-  vec3 spark = electricColor * veins * (0.5 + flash * 5.0) * pulse;
-  
-  spark *= smoothstep(0.2, 0.8, vNoise);
-
-  // Rim lighting
-  vec3 viewDir = vec3(0.0, 0.0, 1.0);
+  // 4. RIM LIGHTING for 3D volume feel
+  vec3 viewDir = vec3(0.0, 0.0, 1.0); // Simplified view dir
   float rim = 1.0 - max(dot(vNormal, viewDir), 0.0);
-  rim = pow(rim, 3.0);
-  vec3 rimColor = vec3(0.0, 0.2, 0.1) * rim;
+  rim = pow(rim, 2.0);
+  col += vec3(0.2, 0.4, 0.6) * rim * 0.5;
 
-  gl_FragColor = vec4(cloudColor + spark + rimColor, 1.0);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -204,7 +234,7 @@ export class CloudScene {
 
     // Camera setup
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 1000);
-    this.camera.position.set(0, 0, 40);
+    this.camera.position.set(0, 0, 30);
 
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     this.renderer.setSize(this.width, this.height);
@@ -215,7 +245,7 @@ export class CloudScene {
     this.controls.enableDamping = true;
     this.controls.enableZoom = false;
     this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.8;
+    this.controls.autoRotateSpeed = 1.0;
 
     this.clock = new THREE.Clock();
 
@@ -226,13 +256,12 @@ export class CloudScene {
   }
 
   initCloud() {
-    // High resolution geometry
-    const geometry = new THREE.IcosahedronGeometry(10, 6);
+    // High resolution geometry for smooth displacement
+    const geometry = new THREE.IcosahedronGeometry(10, 20); // Increased detail
 
     this.uniforms = {
       time: { value: 0.0 },
-      displacementStrength: { value: 2.5 },
-      noiseScale: { value: 2.5 }
+      displacementStrength: { value: 2.0 },
     };
 
     const material = new THREE.ShaderMaterial({
@@ -244,10 +273,6 @@ export class CloudScene {
     });
 
     this.cloudMesh = new THREE.Mesh(geometry, material);
-
-    // Scale down to 20% of original size
-    this.cloudMesh.scale.set(0.2, 0.2, 0.2);
-
     this.scene.add(this.cloudMesh);
   }
 
