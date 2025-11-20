@@ -31,59 +31,26 @@
       <button id="dump-btn">
         <span class="btn-text">감정 배설</span>
       </button>
-      <!DOCTYPE html>
-      <html lang="en">
 
-      <head>
-        <meta charset="UTF-8" />
-        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PoopBin.click</title>
-        <link rel="manifest" href="/manifest.json">
-        <link rel="stylesheet" href="./src/style.css" />
-      </head>
+      <div id="global-counter-container">
+        국가 총 배설: <span id="global-counter">Loading...</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
 
-      <body>
-        <div id="app">
-          <nav id="navbar">
-            <div class="nav-title">POOPBIN</div>
-            <div class="nav-buttons">
-              <button id="btn-cloud" class="icon-btn" title="Cloud Skin">☁️</button>
-              <button id="btn-stats" class="icon-btn" title="Statistics">📊</button>
-              <button id="btn-rocket" class="icon-btn" title="Space Journey">🚀</button>
-              <button id="btn-info" class="icon-btn" title="Info">ℹ️</button>
-              <button id="btn-youtube" class="icon-btn" title="YouTube">▶️</button>
-            </div>
-          </nav>
-
-          <div id="canvas-container"></div>
-
-          <div id="ui-layer">
-            <div id="local-counter" class="counter">0</div>
-
-            <button id="dump-btn">
-              <span class="btn-text">감정 배설</span>
-            </button>
-
-            <div id="global-counter-container">
-              국가 총 배설: <span id="global-counter">Loading...</span>
-            </div>
-          </div>
-        </div>
-        <script>
-          if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-              navigator.serviceWorker.register('/sw.js')
-                .then(registration => {
-                  console.log('SW registered: ', registration);
-                })
-                .catch(registrationError => {
-                  console.log('SW registration failed: ', registrationError);
-                });
-            });
-          }
-        </script>
-        <script type="module" src="./src/main.js"></script>
-      </body>
-
-      </html>
+</html>
