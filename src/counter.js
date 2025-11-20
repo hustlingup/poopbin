@@ -8,7 +8,8 @@ const firebaseConfig = {
     storageBucket: "poopbin-1d55c.firebasestorage.app",
     messagingSenderId: "419162142984",
     appId: "1:419162142984:web:53bd92ebf5dc6c618114bd",
-    measurementId: "G-BRB0ERLDEE"
+    measurementId: "G-BRB0ERLDEE",
+    databaseURL: "https://poopbin-1d55c-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 
 export class CounterManager {

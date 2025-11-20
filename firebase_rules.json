@@ -1,0 +1,9 @@
+{
+    "rules": {
+        "global_clicks": {
+            ".read": true,
+            ".write": true,
+            ".validate": "newData.isNumber()"
+        }
+    }
+}
