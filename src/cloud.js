@@ -23,34 +23,6 @@ export class CloudScene {
     this.controls.enableZoom = false; // Disable zoom to keep layout stable? User didn't specify, but usually good for background.
 
     this.initCloud();
-    this.animate();
-
-    window.addEventListener('resize', this.onResize.bind(this));
-  }
-
-  initCloud() {
-    // Generate a procedural smoke texture since "/mnt/data/1-1.png" is not available
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-
-    // Soft radial gradient for smoke puff
-    const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.5)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 256);
-
-    const smokeTex = new THREE.CanvasTexture(canvas);
-    smokeTex.wrapS = smokeTex.wrapT = THREE.ClampToEdgeWrapping;
-    smokeTex.minFilter = THREE.LinearFilter;
-
-    this.smokeGroup = new THREE.Group();
-    this.scene.add(this.smokeGroup);
-
     const layerCount = 6;
     for (let i = 0; i < layerCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
