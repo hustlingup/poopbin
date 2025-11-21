@@ -99,206 +99,104 @@ body {
 #ui-layer {
   position: absolute;
   top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  /* Let clicks pass through to canvas if needed, but buttons need pointer-events: auto */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 100px 0 50px 0;
+}
 
-  :root {
-    --bg-color: #f0f0f0;
-    /* Light gray background */
-    --text-color: #333;
-    --btn-black: #000;
-    --btn-text: #fff;
-    --accent-green: #4a5d23;
-    /* Dark green-brown */
-    --font-main: 'Inter', sans-serif;
-  }
+.counter {
+  font-size: 4rem;
+  font-weight: 700;
+  color: #333;
+  z-index: 20;
+}
 
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    user-select: none;
-    -webkit-user-select: none;
-  }
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: auto;
+  margin-bottom: 20px;
+  pointer-events: auto;
+}
 
-  body {
-    font-family: var(--font-main);
-    /* Mocking the background gradient: Dark gray/blueish vignette */
-    background: radial-gradient(circle at 50% 30%, #2b2b2b 0%, #000000 100%);
-    color: var(--text-color);
-    overflow: hidden;
-    width: 100vw;
-    height: 100vh;
-  }
+#dump-btn {
+  background: var(--btn-black);
+  color: var(--btn-text);
+  border: 2px solid white;
+  padding: 15px 40px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: visible;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  #app {
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
+#dump-btn:active {
+  transform: scale(0.95);
+}
 
-  /* Navbar */
-  #navbar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 10px;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-  }
+#btn-colors {
+  background: var(--btn-black);
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  .nav-title {
-    font-size: 2rem;
-    font-weight: 900;
-    color: white;
-    /* As per spec */
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    pointer-events: none;
-  }
+#btn-colors img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
 
-  .nav-buttons {
-    display: flex;
-    gap: 15px;
-  }
+#btn-colors:active {
+  transform: scale(0.95);
+}
 
-  .icon-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    opacity: 0.8;
-    transition: transform 0.1s;
-    padding: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    -webkit-tap-highlight-color: transparent;
-    /* Fix tap highlight */
-  }
+#global-counter-container {
+  font-size: 1rem;
+  color: #555;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 5px 10px;
+  border-radius: 10px;
+}
 
-  .icon-btn img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-  }
+/* Gooey Particles */
+#particle-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 15;
+  filter: url('#goo');
+}
 
-  .icon-btn:active {
-    transform: scale(0.9);
-  }
-
-  /* Canvas */
-  #canvas-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-  }
-
-  /* UI Layer */
-  #ui-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10;
-    pointer-events: none;
-    /* Let clicks pass through to canvas if needed, but buttons need pointer-events: auto */
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    padding: 100px 0 50px 0;
-  }
-
-  .counter {
-    font-size: 4rem;
-    font-weight: 700;
-    color: #333;
-    z-index: 20;
-  }
-
-  .action-buttons {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-top: auto;
-    margin-bottom: 20px;
-    pointer-events: auto;
-  }
-
-  #dump-btn {
-    background: var(--btn-black);
-    color: var(--btn-text);
-    border: 2px solid white;
-    padding: 15px 40px;
-    font-size: 1.2rem;
-    font-weight: bold;
-    border-radius: 30px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: visible;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  #dump-btn:active {
-    transform: scale(0.95);
-  }
-
-  #btn-colors {
-    background: var(--btn-black);
-    border: 2px solid white;
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  #btn-colors img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-  }
-
-  #btn-colors:active {
-    transform: scale(0.95);
-  }
-
-  #global-counter-container {
-    font-size: 1rem;
-    color: #555;
-    background: rgba(255, 255, 255, 0.8);
-    padding: 5px 10px;
-    border-radius: 10px;
-  }
-
-  /* Gooey Particles */
-  #particle-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 15;
-    filter: url('#goo');
-  }
-
-  .gooey-particle {
-    position: absolute;
-    /* width and height set in JS */
-    /* background-image set in JS */
-    border-radius: 50%;
-    pointer-events: none;
-    box-shadow: 0 0 15px 2px rgba(255, 100, 0, 0.6);
-    /* Glow to match fire */
-  }
+.gooey-particle {
+  position: absolute;
+  /* width and height set in JS */
+  /* background-image set in JS */
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 15px 2px rgba(255, 100, 0, 0.6);
+  /* Glow to match fire */
+}
