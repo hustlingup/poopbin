@@ -2,13 +2,36 @@ import './style.css';
 import { CloudScene } from './cloud.js';
 import { CounterManager } from './counter.js';
 import gsap from 'gsap';
+import * as THREE from 'three';
 
 document.addEventListener('DOMContentLoaded', () => {
     const cloud = new CloudScene('canvas-container');
     const counters = new CounterManager();
 
     const dumpBtn = document.getElementById('dump-btn');
+    const colorsBtn = document.getElementById('btn-colors');
     const particleContainer = document.getElementById('particle-container');
+
+    let currentThemeColor = '#ffff00'; // Default yellow
+
+    if (colorsBtn) {
+        colorsBtn.addEventListener('click', () => {
+            // Random hex color
+            const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+            currentThemeColor = randomColor;
+
+            // Update cloud
+            if (cloud) cloud.updateColor(randomColor);
+
+            // Animate button
+            gsap.to(colorsBtn, {
+                scale: 0.9,
+                yoyo: true,
+                repeat: 1,
+                duration: 0.1
+            });
+        });
+    }
 
     dumpBtn.addEventListener('click', (e) => {
         // 1. Spawn Gooey Particles
@@ -35,8 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const centerY = window.innerHeight / 2;
 
         // Define "Surface" radius (approximate fire size)
-        // Fire sphere is radius 15 in 3D units, roughly mapping to pixels depending on camera z
-        // Let's estimate it visually as ~60px radius
         const surfaceRadius = 60;
 
         for (let i = 0; i < 10; i++) {
@@ -48,14 +69,23 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
 
-            // Gradient Color (Fire Palette)
-            // Gradient Color (Fire Palette)
-            // Match the 3D fire: Core (White) -> Inner (Yellow) -> Outer (Red)
+            // Dynamic Gradient Color based on currentThemeColor
+            const base = new THREE.Color(currentThemeColor);
+            const hsl = {};
+            base.getHSL(hsl);
+
+            // Generate variations
+            const lighter = new THREE.Color().setHSL(hsl.h, hsl.s, Math.min(1, hsl.l + 0.1)).getStyle();
+            const darker = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.2)).getStyle();
+            const core = '#ffffff';
+            const baseStyle = base.getStyle();
+
             const gradients = [
-                'radial-gradient(circle at 30% 30%, #ffffff 0%, #ffff00 20%, #ff0000 100%)',
-                'radial-gradient(circle at 30% 30%, #ffff00 0%, #ff8800 40%, #ff0000 100%)',
-                'radial-gradient(circle at 30% 30%, #ffffff 10%, #ffeb3b 30%, #ff5722 100%)'
+                `radial-gradient(circle at 30% 30%, ${core} 0%, ${baseStyle} 20%, ${darker} 100%)`,
+                `radial-gradient(circle at 30% 30%, ${baseStyle} 0%, ${lighter} 40%, ${darker} 100%)`,
+                `radial-gradient(circle at 30% 30%, ${core} 10%, ${baseStyle} 30%, ${darker} 100%)`
             ];
+
             const gradient = gradients[Math.floor(Math.random() * gradients.length)];
             p.style.backgroundImage = gradient;
 

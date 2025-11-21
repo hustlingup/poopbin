@@ -203,6 +203,28 @@ export class CloudScene {
     this.rippleIndex = (this.rippleIndex + 1) % ripples.length;
   }
 
+  updateColor(hexColor) {
+    if (!this.fireMesh) return;
+
+    const base = new THREE.Color(hexColor);
+    const hsl = {};
+    base.getHSL(hsl);
+
+    // Outer: Darker
+    const outer = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.2));
+
+    // Inner: Base color
+    const inner = base.clone();
+
+    // Core: Lighter, almost white
+    const core = new THREE.Color().setHSL(hsl.h, hsl.s, Math.min(1, hsl.l + 0.4));
+
+    const uniforms = this.fireMesh.material.uniforms;
+    uniforms.colorOuter.value.copy(outer);
+    uniforms.colorInner.value.copy(inner);
+    uniforms.colorCore.value.copy(core);
+  }
+
   initParticles() {
     // Fire Particles Overlay
     const particleCount = 1600;
