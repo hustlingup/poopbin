@@ -45,15 +45,22 @@ export class CloudScene {
     // Based on noise and displacement to mimic the reference
 
     const geometry = new THREE.SphereGeometry(15, 64, 64); // Reduced size 50%
+
+    // Max ripples to track
+    const MAX_RIPPLES = 10;
+    this.ripples = []; // { pos: vec3, time: float }
+
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
         colorOuter: { value: new THREE.Color(0xff0000) }, // Red
         colorInner: { value: new THREE.Color(0xffff00) }, // Yellow
-        colorCore: { value: new THREE.Color(0xffffff) }   // White
+        colorCore: { value: new THREE.Color(0xffffff) },  // White
+        uRipples: { value: new Array(MAX_RIPPLES).fill(new THREE.Vector4(0, 0, 0, -1000)) } // x,y,z, startTime
       },
       vertexShader: `
         uniform float time;
+        uniform vec4 uRipples[${MAX_RIPPLES}];
         varying vec2 vUv;
         varying float vDisplace;
         
@@ -111,9 +118,26 @@ export class CloudScene {
           
           // Turbulence
           float noise = sin(position.x * 0.1 + time * 2.0) * sin(position.y * 0.1 + time) * sin(position.z * 0.1 + time * 1.5);
-          vDisplace = noise;
           
-          vec3 newPos = position + normal * (noise * 10.0);
+          // Ripple Effect
+          float rippleSum = 0.0;
+          for(int i = 0; i < ${MAX_RIPPLES}; i++) {
+            vec4 r = uRipples[i];
+            if(r.w > -900.0) { // Active ripple
+               float age = time - r.w;
+               if(age > 0.0 && age < 2.0) { // Lasts 2 seconds
+                 float dist = distance(position, r.xyz);
+                 // Wave function: sin(dist * freq - age * speed) * decay
+                 float wave = sin(dist * 0.5 - age * 10.0);
+                 float decay = exp(-age * 2.0) * smoothstep(15.0, 0.0, dist); // Decay over time and distance
+                 rippleSum += wave * decay * 2.0; // Amplitude
+               }
+            }
+          }
+
+          vDisplace = noise + rippleSum;
+          
+          vec3 newPos = position + normal * (vDisplace * 10.0);
           
           // Taper up
           float yNorm = (position.y + 30.0) / 60.0; // 0 to 1 approx
@@ -150,6 +174,33 @@ export class CloudScene {
 
     this.fireMesh = new THREE.Mesh(geometry, material);
     this.scene.add(this.fireMesh);
+  }
+
+  triggerRipple(angle) {
+    if (!this.fireMesh) return;
+
+    // Calculate impact point on the sphere surface
+    // Sphere radius is 15.
+    // Angle is in XY plane (screen space projection)
+    // Map to 3D: x = r*cos(theta), y = r*sin(theta), z = 0 (approx front face)
+    // Actually, let's put it slightly on the front hemisphere
+    const r = 15;
+    const x = r * Math.cos(angle);
+    const y = r * Math.sin(angle);
+    const z = 5.0; // Slightly in front
+
+    const impactPos = new THREE.Vector3(x, y, z);
+
+    // Find oldest ripple slot to overwrite
+    const uniforms = this.fireMesh.material.uniforms;
+    const ripples = uniforms.uRipples.value;
+    const time = uniforms.time.value;
+
+    // Simple round-robin or find oldest
+    if (!this.rippleIndex) this.rippleIndex = 0;
+
+    ripples[this.rippleIndex].set(x, y, z, time);
+    this.rippleIndex = (this.rippleIndex + 1) % ripples.length;
   }
 
   initParticles() {

@@ -88,11 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetY = centerY + Math.sin(angle) * surfaceRadius;
 
             // Animate
-            animateParticle(p, startX, startY, targetX, targetY);
+            animateParticle(p, startX, startY, targetX, targetY, angle);
         }
     }
 
-    function animateParticle(el, startX, startY, targetX, targetY) {
+    function animateParticle(el, startX, startY, targetX, targetY, angle) {
         let progress = 0;
         const speed = 0.005 + Math.random() * 0.005; // Random speed
 
@@ -104,6 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
             progress += speed;
             if (progress >= 1) {
                 el.remove();
+                // Trigger ripple on the 3D object
+                if (cloud && cloud.triggerRipple) {
+                    cloud.triggerRipple(angle);
+                }
                 return;
             }
 
