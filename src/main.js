@@ -47,6 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.backgroundImage = "url('/textures/smoke.png')";
             p.style.backgroundSize = 'cover';
 
+            // Random Color
+            const colors = ['#ff0000', '#ff4500', '#ffa500', '#ffff00', '#ffffff'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            p.style.backgroundColor = color;
+
             // Spawn at random border position
             // Perimeter = 2w + 2h
             const perimeter = 2 * rect.width + 2 * rect.height;

@@ -170,4 +170,5 @@ body {
   background-position: center;
   border-radius: 50%;
   pointer-events: none;
+  background-blend-mode: hard-light;
 }
