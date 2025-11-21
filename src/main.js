@@ -49,11 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.height = `${size}px`;
 
             // Gradient Color (Fire Palette)
+            // Gradient Color (Fire Palette)
+            // Match the 3D fire: Core (White) -> Inner (Yellow) -> Outer (Red)
             const gradients = [
-                'radial-gradient(circle at 30% 30%, #ffeb3b, #ff9800)', // Yellow -> Orange
-                'radial-gradient(circle at 30% 30%, #ff9800, #f44336)', // Orange -> Red
-                'radial-gradient(circle at 30% 30%, #ffffff, #ffeb3b)', // White -> Yellow
-                'radial-gradient(circle at 30% 30%, #f44336, #d32f2f)'  // Red -> Dark Red
+                'radial-gradient(circle at 30% 30%, #ffffff 0%, #ffff00 20%, #ff0000 100%)',
+                'radial-gradient(circle at 30% 30%, #ffff00 0%, #ff8800 40%, #ff0000 100%)',
+                'radial-gradient(circle at 30% 30%, #ffffff 10%, #ffeb3b 30%, #ff5722 100%)'
             ];
             const gradient = gradients[Math.floor(Math.random() * gradients.length)];
             p.style.backgroundImage = gradient;

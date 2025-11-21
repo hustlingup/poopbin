@@ -168,4 +168,6 @@ body {
   /* background-image set in JS */
   border-radius: 50%;
   pointer-events: none;
+  box-shadow: 0 0 15px 2px rgba(255, 100, 0, 0.6);
+  /* Glow to match fire */
 }
