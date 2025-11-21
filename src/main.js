@@ -16,8 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (colorsBtn) {
         colorsBtn.addEventListener('click', () => {
-            // Random hex color
-            const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+            // Random bright color using HSL
+            // Hue: 0-1 (all colors)
+            // Saturation: 0.6-1.0 (vivid)
+            // Lightness: 0.4-0.7 (avoid too dark or too white)
+            const hue = Math.random();
+            const saturation = 0.6 + Math.random() * 0.4;
+            const lightness = 0.4 + Math.random() * 0.3;
+
+            const color = new THREE.Color().setHSL(hue, saturation, lightness);
+            const randomColor = '#' + color.getHexString();
             currentThemeColor = randomColor;
 
             // Update cloud
