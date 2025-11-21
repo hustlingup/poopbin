@@ -79,15 +79,6 @@ body {
   width: 32px;
   height: 32px;
   object-fit: contain;
-  /* Apply yellow tint filter if desired, or keep original colors. 
-     User spec said "transparent yellow small icon buttons" initially.
-     If these are colored PNGs, we might not want the filter.
-     If they are white/black, we might want it.
-     Let's keep the filter but adjust it to be less aggressive or remove if they are full color.
-     Assuming they are full color PNGs based on names, I will remove the heavy sepia/hue-rotate 
-     and just let them be, or maybe just opacity. 
-     The user said "20% transparent yellow icons" in spec, but now "replace with png".
-     I'll remove the filter for now to show the PNGs clearly. */
 }
 
 .icon-btn:active {
@@ -168,13 +159,15 @@ body {
   height: 100%;
   pointer-events: none;
   z-index: 15;
-  /* Above UI layer buttons but below text if needed, or just mix */
   filter: url('#goo');
 }
 
-.particle {
+.gooey-particle {
   position: absolute;
+  width: 30px;
+  height: 30px;
+  background: #ffffff;
+  /* White for gooey effect */
   border-radius: 50%;
-  background-color: #00ffaa;
-  /* Vibrant green base for particles */
+  pointer-events: none;
 }
