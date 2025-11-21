@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // We can parse the gradient or just use a nice color
                 const color = new THREE.Color(currentThemeColor);
 
-                cloud.fluidSim.addSplat(u, v, velX * 2.0, -velY * 2.0, color);
+                cloud.fluidSim.addSplat(u, v, velX * 0.5, -velY * 0.5, color);
             }
 
             // Absorption Effect (Gooey Merge)

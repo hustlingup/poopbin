@@ -9,8 +9,8 @@ export class FluidSimulator {
         // Simulation parameters
         this.dt = 0.016;
         this.iterations = 10; // Jacobi iterations for pressure
-        this.curl = 30;
-        this.splatRadius = 0.005;
+        this.curl = 5; // Reduced from 30
+        this.splatRadius = 0.001; // Reduced from 0.005
         this.dissipation = 0.98;
 
         this.initShaders();
