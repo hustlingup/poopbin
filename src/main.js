@@ -38,10 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const p = document.createElement('div');
             p.classList.add('gooey-particle');
 
-            // Random size 10px to 50px
-            const size = 10 + Math.random() * 40;
+            // Random size 5px to 20px
+            const size = 5 + Math.random() * 15;
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
+
+            // Add texture
+            p.style.backgroundImage = "url('/textures/smoke.png')";
+            p.style.backgroundSize = 'cover';
 
             // Spawn at random border position
             // Perimeter = 2w + 2h

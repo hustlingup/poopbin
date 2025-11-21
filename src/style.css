@@ -164,10 +164,10 @@ body {
 
 .gooey-particle {
   position: absolute;
-  width: 30px;
-  height: 30px;
-  background: #ffffff;
-  /* White for gooey effect */
+  /* width and height set in JS */
+  /* background-image set in JS */
+  background-repeat: no-repeat;
+  background-position: center;
   border-radius: 50%;
   pointer-events: none;
 }

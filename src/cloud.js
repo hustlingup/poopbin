@@ -35,7 +35,7 @@ export class CloudScene {
     this.clock = new THREE.Clock();
 
     this.initFire();
-    this.initParticles();
+    // this.initParticles(); // Removed spark effect
     this.addEvents();
     this.animate();
   }
@@ -44,7 +44,7 @@ export class CloudScene {
     // 3D Fire Shader Material
     // Based on noise and displacement to mimic the reference
 
-    const geometry = new THREE.SphereGeometry(30, 64, 64);
+    const geometry = new THREE.SphereGeometry(15, 64, 64); // Reduced size 50%
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
