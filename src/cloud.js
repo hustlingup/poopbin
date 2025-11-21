@@ -130,7 +130,7 @@ export class CloudScene {
                  // Wave function: sin(dist * freq - age * speed) * decay
                  float wave = sin(dist * 0.5 - age * 10.0);
                  float decay = exp(-age * 2.0) * smoothstep(15.0, 0.0, dist); // Decay over time and distance
-                 rippleSum += wave * decay * 2.0; // Amplitude
+                 rippleSum += wave * decay * 0.1; // Amplitude (Reduced to 5%)
                }
             }
           }
