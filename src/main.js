@@ -32,14 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function spawnGooeyParticles(btn, container) {
         const rect = btn.getBoundingClientRect();
         const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2; // Target: Center of screen (Main Object)
+        const centerY = window.innerHeight / 2;
+
+        // Define "Surface" radius (approximate fire size)
+        // Fire sphere is radius 15 in 3D units, roughly mapping to pixels depending on camera z
+        // Let's estimate it visually as ~60px radius
+        const surfaceRadius = 60;
 
         for (let i = 0; i < 10; i++) {
             const p = document.createElement('div');
             p.classList.add('gooey-particle');
 
-            // Random size 5px to 20px
-            const size = 5 + Math.random() * 15;
+            // Random size 5px to 30px
+            const size = 5 + Math.random() * 25;
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
 
@@ -54,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.backgroundImage = gradient;
 
             // Spawn at random border position
-            // Perimeter = 2w + 2h
             const perimeter = 2 * rect.width + 2 * rect.height;
             const pos = Math.random() * perimeter;
             let startX, startY;
@@ -77,8 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.top = `${startY}px`;
             container.appendChild(p);
 
+            // Calculate random destination on the surface
+            const angle = Math.random() * Math.PI * 2;
+            const targetX = centerX + Math.cos(angle) * surfaceRadius;
+            const targetY = centerY + Math.sin(angle) * surfaceRadius;
+
             // Animate
-            animateParticle(p, startX, startY, centerX, centerY);
+            animateParticle(p, startX, startY, targetX, targetY);
         }
     }
 
@@ -86,9 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let progress = 0;
         const speed = 0.005 + Math.random() * 0.005; // Random speed
 
-        // Random control points for "2 smooth direction changes"
-        // We can use a cubic bezier or just sine wave offsets
-        // Let's use sine wave offsets for "fluid" feel
         const offsetFreq = 0.05 + Math.random() * 0.05;
         const offsetAmp = 50 + Math.random() * 50;
         const phase = Math.random() * Math.PI * 2;
@@ -105,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentY = startY + (targetY - startY) * progress;
 
             // Add fluid noise/wave
-            // 2 direction changes can be simulated by a sine wave with ~1 period
             const wave = Math.sin(progress * Math.PI * 2 + phase);
 
             // Perpendicular vector to path
@@ -115,15 +120,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const nx = -dy / len;
             const ny = dx / len;
 
-            const x = currentX + nx * wave * offsetAmp * (1 - progress); // Dampen amplitude as it gets closer
-            const y = currentY + ny * wave * offsetAmp * (1 - progress);
+            // Dampen amplitude as it gets closer to 1 to hit the target precisely
+            const amp = offsetAmp * (1 - progress);
+
+            const x = currentX + nx * wave * amp;
+            const y = currentY + ny * wave * amp;
 
             el.style.left = `${x}px`;
             el.style.top = `${y}px`;
 
-            // Scale down at the end (absorb)
-            if (progress > 0.8) {
-                el.style.transform = `scale(${1 - (progress - 0.8) * 5})`;
+            // Absorption Effect (Gooey Merge)
+            // Start shrinking/fading when close
+            if (progress > 0.85) {
+                const absorbProgress = (progress - 0.85) / 0.15; // 0 to 1
+                // Scale down
+                const scale = 1 - absorbProgress;
+                // Maybe stretch towards the center to look like being sucked in?
+                // For now, simple scale is good for gooey effect
+                el.style.transform = `scale(${scale})`;
+                el.style.opacity = `${scale}`;
             }
 
             requestAnimationFrame(loop);
