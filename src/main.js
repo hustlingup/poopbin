@@ -172,25 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
             el.style.left = `${x}px`;
             el.style.top = `${y}px`;
 
-            // Fluid Interaction
-            if (cloud && cloud.fluidSim) {
-                // Normalize coordinates to 0-1
-                const u = x / window.innerWidth;
-                const v = 1.0 - (y / window.innerHeight); // Flip Y for texture coords
-
-                // Calculate velocity for splat (direction of movement)
-                // Simple approximation based on current vs previous (or just path direction)
-                // Let's use the path direction + wave influence
-                const velX = (dx / len) + nx * Math.cos(progress * Math.PI * 2 + phase) * 2.0;
-                const velY = (dy / len) + ny * Math.cos(progress * Math.PI * 2 + phase) * 2.0;
-
-                // Color from element background (simplified, just use theme color or random)
-                // We can parse the gradient or just use a nice color
-                const color = new THREE.Color(currentThemeColor);
-
-                cloud.fluidSim.addSplat(u, v, velX * 0.5, -velY * 0.5, color);
-            }
-
             // Absorption Effect (Gooey Merge)
             // Start shrinking/fading when close
             if (progress > 0.85) {
