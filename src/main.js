@@ -3,6 +3,7 @@ import { CloudScene } from './cloud.js';
 import { CounterManager } from './counter.js';
 import gsap from 'gsap';
 import * as THREE from 'three';
+import { SimplexNoise } from './utils/noise.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const cloud = new CloudScene('canvas-container');
@@ -60,42 +61,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    const noise = new SimplexNoise();
+
     function spawnGooeyParticles(btn, container) {
         const rect = btn.getBoundingClientRect();
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
         // Define "Surface" radius (approximate fire size)
-        const surfaceRadius = 60;
+        const surfaceRadius = 40; // Slightly smaller to go "into" the fire
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 12; i++) { // Increased count slightly
             const p = document.createElement('div');
             p.classList.add('gooey-particle');
 
-            // Random size 5px to 30px
-            const size = 5 + Math.random() * 25;
+            // Random size 10px to 35px
+            const size = 10 + Math.random() * 25;
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
 
-            // Dynamic Gradient Color based on currentThemeColor
+            // Initial Colors
             const base = new THREE.Color(currentThemeColor);
             const hsl = {};
             base.getHSL(hsl);
 
-            // Generate variations
-            const lighter = new THREE.Color().setHSL(hsl.h, hsl.s, Math.min(1, hsl.l + 0.1)).getStyle();
-            const darker = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.2)).getStyle();
-            const core = '#ffffff';
-            const baseStyle = base.getStyle();
+            // Store initial HSL for degradation
+            p.dataset.h = hsl.h;
+            p.dataset.s = hsl.s;
+            p.dataset.l = hsl.l;
 
-            const gradients = [
-                `radial-gradient(circle at 30% 30%, ${core} 0%, ${baseStyle} 20%, ${darker} 100%)`,
-                `radial-gradient(circle at 30% 30%, ${baseStyle} 0%, ${lighter} 40%, ${darker} 100%)`,
-                `radial-gradient(circle at 30% 30%, ${core} 10%, ${baseStyle} 30%, ${darker} 100%)`
-            ];
-
-            const gradient = gradients[Math.floor(Math.random() * gradients.length)];
-            p.style.backgroundImage = gradient;
+            // Set initial look
+            updateParticleAppearance(p, 0, size);
 
             // Spawn at random border position
             const perimeter = 2 * rect.width + 2 * rect.height;
@@ -126,62 +122,104 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetY = centerY + Math.sin(angle) * surfaceRadius;
 
             // Animate
-            animateParticle(p, startX, startY, targetX, targetY, angle);
+            animateParticle(p, startX, startY, targetX, targetY, angle, size);
         }
     }
 
-    function animateParticle(el, startX, startY, targetX, targetY, angle) {
-        let progress = 0;
-        const speed = 0.005 + Math.random() * 0.005; // Random speed
+    function updateParticleAppearance(p, progress, size) {
+        // Degradation Logic
+        // 0.0 -> 1.0
+        // Glossy/Vibrant -> Matte/Absorbed
 
-        const offsetFreq = 0.05 + Math.random() * 0.05;
-        const offsetAmp = 50 + Math.random() * 50;
-        const phase = Math.random() * Math.PI * 2;
+        const h = parseFloat(p.dataset.h);
+        const s = parseFloat(p.dataset.s);
+        const l = parseFloat(p.dataset.l);
+
+        // As progress increases:
+        // Saturation decreases slightly
+        // Lightness decreases (gets darker/absorbed)
+        // Core opacity decreases (glossiness fades)
+
+        const currentS = s * (1 - progress * 0.3);
+        const currentL = l * (1 - progress * 0.5); // Darken significantly
+
+        const baseColor = new THREE.Color().setHSL(h, currentS, currentL);
+        const darkerColor = new THREE.Color().setHSL(h, currentS, Math.max(0, currentL - 0.2));
+
+        // Specular highlight (Core)
+        // Fades out as progress goes > 0.5
+        const coreOpacity = Math.max(0, 1 - progress * 1.5);
+        const coreColor = `rgba(255, 255, 255, ${coreOpacity})`;
+
+        const baseStyle = baseColor.getStyle();
+        const darkerStyle = darkerColor.getStyle();
+
+        // Shift gradient center slightly to simulate 3D sphere rotation/movement
+        const gradX = 30 + progress * 20; // 30% -> 50%
+        const gradY = 30 + progress * 20;
+
+        const gradient = `radial-gradient(circle at ${gradX}% ${gradY}%, ${coreColor} 0%, ${baseStyle} 40%, ${darkerStyle} 100%)`;
+
+        p.style.backgroundImage = gradient;
+        p.style.boxShadow = `0 0 ${10 * (1 - progress)}px ${baseStyle}`; // Glow fades
+    }
+
+    function animateParticle(el, startX, startY, targetX, targetY, angle, size) {
+        let progress = 0;
+        const duration = 100 + Math.random() * 100; // Frames roughly
+        const speed = 1 / duration;
+
+        // Fluid Noise Parameters
+        const noiseScale = 0.005; // Spatial scale
+        const timeScale = 0.01;   // Temporal scale
+        const amp = 30;           // Amplitude of noise displacement
+
+        // Unique offset for this particle
+        const seed = Math.random() * 1000;
 
         function loop() {
             progress += speed;
+
             if (progress >= 1) {
                 el.remove();
-                // Trigger ripple on the 3D object
                 if (cloud && cloud.triggerRipple) {
                     cloud.triggerRipple(angle);
                 }
                 return;
             }
 
-            // Linear interpolation
-            const currentX = startX + (targetX - startX) * progress;
-            const currentY = startY + (targetY - startY) * progress;
+            // 1. Linear Path
+            const linearX = startX + (targetX - startX) * progress;
+            const linearY = startY + (targetY - startY) * progress;
 
-            // Add fluid noise/wave
-            const wave = Math.sin(progress * Math.PI * 2 + phase);
+            // 2. Fluid Noise Displacement
+            // We use noise to perturb the position
+            const nX = noise.noise2D(linearX * noiseScale, progress * 10 + seed);
+            const nY = noise.noise2D(linearY * noiseScale, progress * 10 + seed + 100);
 
-            // Perpendicular vector to path
-            const dx = targetX - startX;
-            const dy = targetY - startY;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            const nx = -dy / len;
-            const ny = dx / len;
+            // Fade in noise, then fade out near target to ensure it hits the center
+            const noiseStrength = Math.sin(progress * Math.PI) * amp;
 
-            // Dampen amplitude as it gets closer to 1 to hit the target precisely
-            const amp = offsetAmp * (1 - progress);
-
-            const x = currentX + nx * wave * amp;
-            const y = currentY + ny * wave * amp;
+            const x = linearX + nX * noiseStrength;
+            const y = linearY + nY * noiseStrength;
 
             el.style.left = `${x}px`;
             el.style.top = `${y}px`;
 
-            // Absorption Effect (Gooey Merge)
-            // Start shrinking/fading when close
-            if (progress > 0.85) {
-                const absorbProgress = (progress - 0.85) / 0.15; // 0 to 1
-                // Scale down
-                const scale = 1 - absorbProgress;
-                // Maybe stretch towards the center to look like being sucked in?
-                // For now, simple scale is good for gooey effect
+            // 3. Appearance & Degradation
+            updateParticleAppearance(el, progress, size);
+
+            // 4. Scale/Absorb
+            // Start shrinking later, very fast at the end
+            if (progress > 0.8) {
+                const absorb = (progress - 0.8) / 0.2;
+                const scale = 1 - absorb;
                 el.style.transform = `scale(${scale})`;
                 el.style.opacity = `${scale}`;
+            } else {
+                // Slight pulse or stretch could go here
+                el.style.transform = `scale(1)`;
+                el.style.opacity = `1`;
             }
 
             requestAnimationFrame(loop);
