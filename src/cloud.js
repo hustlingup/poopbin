@@ -1,145 +1,68 @@
 import * as THREE from 'three';
 
-// --- SHADERS ---
+// --- SHADERS FROM smoke.html ---
 
 const vertexShader = `
 varying vec2 vUv;
-void main() {
-    vUv = uv;
-    gl_Position = vec4(position, 1.0);
-}
+void main(){vUv=uv;gl_Position=vec4(position,1);}
 `;
 
 const fragmentShader = `
+uniform float t;
+uniform vec2 r;
 varying vec2 vUv;
-uniform float u_ratio;
-uniform float u_time;
-uniform vec2 u_pointer;
-uniform float u_click_time;
-uniform vec2 u_click;
 
-// -----------------------------------------------------
-// Noise functions
-// -----------------------------------------------------
-
-vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-
-float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
-                        0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
-                        -0.577350269189626, // -1.0 + 2.0 * C.x
-                        0.024390243902439); // 1.0 / 41.0
-    vec2 i  = floor(v + dot(v, C.yy) );
-    vec2 x0 = v -   i + dot(i, C.xx);
-    vec2 i1;
-    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod289(i);
-    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
-        + i.x + vec3(0.0, i1.x, 1.0 ));
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-    m = m*m ;
-    m = m*m ;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
-    vec3 g;
-    g.x  = a0.x  * x0.x  + h.x  * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
+// Ultra-stable hash noise (impossible to fail)
+float n(vec3 p){
+    p = fract(p*0.3183099 + 0.1);
+    p = p*p*(3.0-2.0*p);
+    return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
 }
 
-// -----------------------------------------------------
-// Main Logic
-// -----------------------------------------------------
-
-float fbm(vec2 p) {
-    float f = 0.0;
-    float w = 0.5;
-    for (int i = 0; i < 5; i++) {
-        f += w * snoise(p);
-        p *= 2.0;
-        w *= 0.5;
+float fbm(vec3 p){
+    float v = 0.0, a = 0.5;
+    for(int i=0; i<5; i++){
+        v += a * n(p);
+        p *= 2.02;
+        p += vec3(0.12, t*0.08, t*0.06);
+        a *= 0.5;
     }
-    return f;
+    return v;
 }
 
-float get_ring_shape(vec2 p, float innerRadius, float outerRadius) {
-    float d = length(p);
-    return smoothstep(innerRadius, innerRadius + 0.02, d) - smoothstep(outerRadius, outerRadius + 0.02, d);
-}
+void main(){
+    vec2 uv = vUv - 0.5;
+    uv.x *= r.x/r.y;
 
-float get_dot_shape(vec2 p, vec2 center, float radius) {
-    float d = length(p - center);
-    return 1.0 - smoothstep(radius, radius + 0.02, d);
-}
+    vec3 ro = vec3(sin(t*0.35)*0.15, -t*0.08, 3.2);
+    vec3 rd = normalize(vec3(uv, -1.0));
 
-void main() {
-    // Normalized coordinates
-    vec2 p = vUv * 2.0 - 1.0;
-    p.x *= u_ratio;
+    vec3 col = vec3(0.0);
+    float T = 1.0;
 
-    // --- NOISE & DISTORTION ---
-    float noise_val = fbm(p * 3.0 + u_time * 0.2);
-    
-    // Distort the coordinate for the ring
-    vec2 ring_p = p + vec2(noise_val * 0.1);
-    
-    // Polar coordinates for more interesting noise movement
-    float angle = atan(ring_p.y, ring_p.x);
-    float radius = length(ring_p);
-    
-    // Add noise based on angle to create the "wobbly" ring effect
-    float angle_noise = fbm(vec2(angle * 2.0, u_time * 0.5));
-    float radius_noise = fbm(vec2(radius * 5.0, u_time * 0.3));
-    
-    // Combine noise
-    float final_noise = (angle_noise + radius_noise) * 0.5;
-    
-    // --- SHAPE ---
-    // Base Ring
-    float ring = get_ring_shape(ring_p, 0.5 + final_noise * 0.2, 0.6 + final_noise * 0.2);
-    
-    // Interaction: Mouse influence
-    // Distort ring near mouse
-    float mouse_dist = distance(p, u_pointer);
-    float mouse_influence = smoothstep(0.5, 0.0, mouse_dist);
-    ring += mouse_influence * 0.5 * snoise(p * 10.0 + u_time);
-    
-    // Click ripple (simple expansion)
-    float click_age = u_time - u_click_time;
-    if (click_age < 1.0 && click_age > 0.0) {
-        float ripple_radius = click_age * 2.0;
-        float ripple = get_ring_shape(p - u_click, ripple_radius, ripple_radius + 0.05);
-        ring += ripple * (1.0 - click_age); // Fade out
+    for(int i = 0; i < 72; i++){
+        vec3 p = ro + rd * 0.05 * float(i);
+        p.y -= t * 0.13;
+
+        float den = fbm(p * 1.4) * 1.3;
+        den += (1.0 - smoothstep(0.0, 2.3, length(p + vec3(0., 0.6, 0.)))) * 3.2;
+        den += fbm(p * 3.1 + vec3(t*0.1)) * 0.7;
+        den = max(den - 0.7, 0.0) * 2.5;
+
+        vec3 smoke = mix(vec3(0.04,0.015,0.008), vec3(0.18,0.07,0.04), den);
+        smoke += vec3(0.0, 1.5, 1.4) * pow(den, 3.8) * 3.8;  // cyan glow
+
+        col += smoke * T * 0.12;
+        T *= exp(-den * 0.09);
+
+        if(T < 0.02) break;
     }
 
-    // --- COLOR ---
-    // Original was orange/red. Changing to Purple/Blue/Pink as requested.
-    
-    vec3 color_bg = vec3(0.0, 0.0, 0.05); // Deep dark blue background
-    
-    // Gradient for the ring
-    vec3 color_1 = vec3(0.2, 0.0, 0.8); // Purple/Blue
-    vec3 color_2 = vec3(0.0, 0.8, 0.9); // Cyan
-    vec3 color_3 = vec3(1.0, 0.0, 0.5); // Pink
-    
-    // Mix colors based on noise and position
-    vec3 ring_color = mix(color_1, color_2, final_noise + 0.5);
-    ring_color = mix(ring_color, color_3, sin(angle + u_time) * 0.5 + 0.5);
-    
-    // Apply shape mask
-    vec3 final_color = mix(color_bg, ring_color, ring);
-    
-    // Add a glow
-    final_color += ring_color * ring * 0.5;
+    col += vec3(0.05,0.05,0.11) * T;
+    col /= col + 1.0;
+    col = pow(col, vec3(0.82));
 
-    gl_FragColor = vec4(final_color, 1.0);
+    gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -154,17 +77,13 @@ export class CloudScene {
     this.height = this.container.clientHeight;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); // 2D Camera
+    this.camera = new THREE.Camera();
+    this.camera.position.z = 1;
 
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     this.renderer.setSize(this.width, this.height);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(1); // As per smoke.html recommendation
     this.container.appendChild(this.renderer.domElement);
-
-    this.clock = new THREE.Clock();
-    this.mouse = new THREE.Vector2(0.5, 0.5);
-    this.clickPos = new THREE.Vector2(0.5, 0.5);
-    this.clickTime = -100.0;
 
     this.init();
     this.addEvents();
@@ -175,19 +94,14 @@ export class CloudScene {
     const geometry = new THREE.PlaneGeometry(2, 2);
 
     this.uniforms = {
-      u_time: { value: 0.0 },
-      u_ratio: { value: this.width / this.height },
-      u_pointer: { value: new THREE.Vector2(0.5, 0.5) },
-      u_click: { value: new THREE.Vector2(0.5, 0.5) },
-      u_click_time: { value: -100.0 }
+      t: { value: 0 },
+      r: { value: new THREE.Vector2(this.width, this.height) }
     };
 
     const material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
       vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-      depthWrite: false,
-      depthTest: false
+      fragmentShader: fragmentShader
     });
 
     this.mesh = new THREE.Mesh(geometry, material);
@@ -196,42 +110,6 @@ export class CloudScene {
 
   addEvents() {
     window.addEventListener('resize', this.onResize.bind(this));
-    window.addEventListener('mousemove', this.onMouseMove.bind(this));
-    window.addEventListener('click', this.onClick.bind(this));
-    window.addEventListener('touchmove', (e) => {
-      const touch = e.targetTouches[0];
-      this.onMouseMove(touch);
-    }, { passive: false });
-    window.addEventListener('touchstart', (e) => {
-      const touch = e.targetTouches[0];
-      this.onClick(touch);
-    }, { passive: false });
-  }
-
-  onMouseMove(event) {
-    // Map to -1 to 1 range, accounting for aspect ratio in shader if needed, 
-    // but shader expects normalized 0-1 or -1-1? 
-    // CodePen shader uses: vec2 p = vUv * 2.0 - 1.0; p.x *= u_ratio;
-    // So pointer should probably be in the same space or normalized UV space.
-    // Let's pass normalized UV space (0 to 1) and convert in shader if needed, 
-    // or convert here to -1 to 1.
-    // The shader uses `distance(p, u_pointer)`. `p` is (-ratio, -1) to (ratio, 1).
-    // So we need to map mouse to that space.
-
-    const x = (event.clientX / window.innerWidth) * 2 - 1;
-    const y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    const ratio = this.width / this.height;
-    this.uniforms.u_pointer.value.set(x * ratio, y);
-  }
-
-  onClick(event) {
-    const x = (event.clientX / window.innerWidth) * 2 - 1;
-    const y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    const ratio = this.width / this.height;
-    this.uniforms.u_click.value.set(x * ratio, y);
-    this.uniforms.u_click_time.value = this.clock.getElapsedTime();
   }
 
   onResize() {
@@ -241,7 +119,7 @@ export class CloudScene {
     this.renderer.setSize(this.width, this.height);
 
     if (this.uniforms) {
-      this.uniforms.u_ratio.value = this.width / this.height;
+      this.uniforms.r.value.set(this.width, this.height);
     }
   }
 
@@ -249,7 +127,7 @@ export class CloudScene {
     requestAnimationFrame(this.animate.bind(this));
 
     if (this.uniforms) {
-      this.uniforms.u_time.value = this.clock.getElapsedTime();
+      this.uniforms.t.value = performance.now() * 0.001;
     }
 
     this.renderer.render(this.scene, this.camera);
