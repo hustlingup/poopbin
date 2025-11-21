@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { FluidSimulator } from './fluid.js';
 
 export class CloudScene {
   constructor(containerId) {
@@ -35,9 +36,27 @@ export class CloudScene {
     this.clock = new THREE.Clock();
 
     this.initFire();
+    this.initFluid();
     // this.initParticles(); // Removed spark effect
     this.addEvents();
     this.animate();
+  }
+
+  initFluid() {
+    this.fluidSim = new FluidSimulator(this.renderer, this.width, this.height);
+
+    // Create a background plane to display the fluid
+    const geometry = new THREE.PlaneGeometry(500, 500); // Large enough to cover background
+    const material = new THREE.MeshBasicMaterial({
+      map: this.fluidSim.getTexture(),
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false
+    });
+
+    this.fluidMesh = new THREE.Mesh(geometry, material);
+    this.fluidMesh.position.z = -20; // Behind the fire
+    this.scene.add(this.fluidMesh);
   }
 
   initFire() {
@@ -313,6 +332,12 @@ export class CloudScene {
       this.fireMesh.material.uniforms.time.value = elapsed;
       // Rotate slightly
       this.fireMesh.rotation.y = elapsed * 0.2;
+    }
+
+    // Update Fluid
+    if (this.fluidSim) {
+      this.fluidSim.step();
+      this.fluidMesh.material.map = this.fluidSim.getTexture();
     }
 
     // Update Particles
