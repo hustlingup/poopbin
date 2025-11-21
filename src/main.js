@@ -43,14 +43,15 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
 
-            // Add texture
-            p.style.backgroundImage = "url('/textures/smoke.png')";
-            p.style.backgroundSize = 'cover';
-
-            // Random Color
-            const colors = ['#ff0000', '#ff4500', '#ffa500', '#ffff00', '#ffffff'];
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            p.style.backgroundColor = color;
+            // Gradient Color (Fire Palette)
+            const gradients = [
+                'radial-gradient(circle at 30% 30%, #ffeb3b, #ff9800)', // Yellow -> Orange
+                'radial-gradient(circle at 30% 30%, #ff9800, #f44336)', // Orange -> Red
+                'radial-gradient(circle at 30% 30%, #ffffff, #ffeb3b)', // White -> Yellow
+                'radial-gradient(circle at 30% 30%, #f44336, #d32f2f)'  // Red -> Dark Red
+            ];
+            const gradient = gradients[Math.floor(Math.random() * gradients.length)];
+            p.style.backgroundImage = gradient;
 
             // Spawn at random border position
             // Perimeter = 2w + 2h

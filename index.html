@@ -55,7 +55,15 @@
         <filter id="goo">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
           <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
-          <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+
+          <!-- Specular Highlight -->
+          <feSpecularLighting in="blur" surfaceScale="5" specularConstant="1" specularExponent="20"
+            lighting-color="#ffffff" result="specular">
+            <fePointLight x="-5000" y="-10000" z="20000" />
+          </feSpecularLighting>
+
+          <feComposite in="specular" in2="goo" operator="in" result="specular" />
+          <feComposite in="SourceGraphic" in2="specular" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
         </filter>
       </defs>
     </svg>
