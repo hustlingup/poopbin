@@ -159,14 +159,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 dumpBtn.style.borderColor = "white";
             }
         });
+
     });
 
     function spawnGooeyParticles(btn, container) {
         const rect = btn.getBoundingClientRect();
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
-        const surfaceRadius = 60;
+
+        let surfaceRadius = 60;
         const currentShape = mainScene ? mainScene.currentShape : 'slime';
+
+        // Adjust surface radius and particle sizes based on shape
+        if (currentShape === 'fire') surfaceRadius = 6;
+        if (currentShape === 'cloud') surfaceRadius = 8;
 
         // Reduced count to 3
         for (let i = 0; i < 3; i++) {
@@ -193,13 +199,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 color2 = '#ff4500';
                 color3 = '#ff0000';
                 borderRadius = '50% 50% 50% 0'; // Teardrop
-                size = 10 + Math.random() * 20;
+                size = 1 + Math.random() * 2; // Reduced 10%
             } else if (currentShape === 'cloud') {
                 // Cloud: White/Gray
                 color1 = '#ffffff';
                 color2 = '#dddddd';
                 color3 = '#bbbbbb';
-                size = 20 + Math.random() * 30; // Larger puffs
+                size = 2 + Math.random() * 3; // Reduced 10%
             } else if (currentShape === 'plasmaball') {
                 // Plasma: Cyan/Blue/White
                 color1 = '#ffffff';
