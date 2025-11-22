@@ -266,107 +266,158 @@ export class MainScene {
   }
 
   initFire() {
-    // Fire Shader
-    // Cone geometry with noise texture scrolling up
-    const geometry = new THREE.ConeGeometry(10, 30, 64, 64, true); // Open ended
+    // Fire Shader based on https://note-space.tauhoo.dev/experiments/3d-fire-effect-in-threejs/
 
-    const material = new THREE.ShaderMaterial({
+    const vertexShader = `
+      precision mediump float;
+      #define PI 3.14
+      uniform float uAnimationProgress;
+      varying vec3 vPosition;
+
+      // Helper functions
+      float random(in vec2 _st) {
+        return fract(sin(dot(_st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+      }
+
+      float wrap(float value){
+        if(value >= 1.){ return mod(value, 1.); }
+        if(value < 0.){ return 1. - mod(value * -1., 1.); }
+        return value;
+      }
+
+      vec2 wrap(vec2 value){
+        return vec2(wrap(value.x), wrap(value.y));
+      }
+
+      float voronoi(vec2 position, vec2 cellNumber){
+        vec2 cellSize = 1. / cellNumber;
+        vec2 cellPosition = floor(position / cellSize) * cellSize + cellSize / 2.;
+        float maxDistance = distance(vec2(0.), cellSize);
+        float minDistance = maxDistance;
+        for(float offsetX = -1.; offsetX < 2.; offsetX++){
+          for(float offsetY = -1.; offsetY < 2.; offsetY++){
+            vec2 currentCellPosition = cellPosition + vec2(offsetX, offsetY) * cellSize;
+            vec2 wrapCellPosition = wrap(currentCellPosition);
+            vec2 offsettedCurrentCellPosition = currentCellPosition + (random(wrapCellPosition) * 2. - 1.) * cellSize / 2.;
+            float currentDistance = distance(position, offsettedCurrentCellPosition);
+            if(minDistance > currentDistance){
+              minDistance = currentDistance;
+            }
+          }
+        }
+        return minDistance / maxDistance;
+      }
+
+      void main() {
+        vPosition = position;
+        
+        vec2 coord = vec2(atan(position.z, position.x) / (2. * PI), position.y * 0.5 + 0.5);
+        vec2 animateOffset = vec2(0., -uAnimationProgress);
+        
+        float noise = voronoi(mod(coord + animateOffset, 1.), vec2(5.));
+        float smallNoise = voronoi(mod(coord + 0.2 + animateOffset, 1.), vec2(8.));
+        float bigNoise = voronoi(mod(coord + 0.4 + animateOffset, 1.), vec2(3.));
+        
+        float distortionScale = (noise + smallNoise + bigNoise) / 3.;
+        vec2 newHorizontalPosition = distance(position.xz, vec2(0)) * (1. - distortionScale * 0.6) * normalize(position.xz);
+        vec3 newPosition = vec3(newHorizontalPosition.x, position.y, newHorizontalPosition.y);
+        
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      precision mediump float;
+      #define PI 3.14
+      uniform float uAnimationProgress;
+      uniform vec3 uColor;
+      varying vec3 vPosition;
+
+      float random(in vec2 _st) {
+        return fract(sin(dot(_st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+      }
+
+      float wrap(float value){
+        if(value >= 1.){ return mod(value, 1.); }
+        if(value < 0.){ return 1. - mod(value * -1., 1.); }
+        return value;
+      }
+
+      vec2 wrap(vec2 value){
+        return vec2(wrap(value.x), wrap(value.y));
+      }
+
+      float voronoi(vec2 position, vec2 cellNumber){
+        vec2 cellSize = 1. / cellNumber;
+        vec2 cellPosition = floor(position / cellSize) * cellSize + cellSize / 2.;
+        float maxDistance = distance(vec2(0.), cellSize);
+        float minDistance = maxDistance;
+        for(float offsetX = -1.; offsetX < 2.; offsetX++){
+          for(float offsetY = -1.; offsetY < 2.; offsetY++){
+            vec2 currentCellPosition = cellPosition + vec2(offsetX, offsetY) * cellSize;
+            vec2 wrapCellPosition = wrap(currentCellPosition);
+            vec2 offsettedCurrentCellPosition = currentCellPosition + (random(wrapCellPosition) * 2. - 1.) * cellSize / 2.;
+            float currentDistance = distance(position, offsettedCurrentCellPosition);
+            if(minDistance > currentDistance){
+              minDistance = currentDistance;
+            }
+          }
+        }
+        return minDistance / maxDistance;
+      }
+
+      void main() {
+        vec2 coord = vec2(atan(vPosition.z, vPosition.x) / (2. * PI), vPosition.y * 0.5 + 0.5);
+        vec2 animateOffset = vec2(0., -uAnimationProgress);
+        
+        float noise = voronoi(mod(coord + animateOffset, 1.), vec2(20.));
+        float smallNoise = voronoi(mod(coord + 0.2 + animateOffset, 1.), vec2(30.));
+        float bigNoise = voronoi(mod(coord + 0.4 + animateOffset, 1.), vec2(10.));
+        
+        float verticalGradient = (-1. * vPosition.y * 0.5 + 0.5) * 1.3 + 0.1;
+        
+        if((noise + smallNoise + bigNoise + verticalGradient) / 4. > 0.3){
+          fragColor = vec4(uColor, 1.0);
+        } else {
+          fragColor = vec4(0.0);
+        }
+      }
+    `;
+
+    // Use a Group to hold both meshes
+    this.currentMesh = new THREE.Group();
+
+    // Geometry (Cylinder or Cone - reference uses loaded GLB but we can approximate with Cylinder/Cone)
+    // Reference uses a specific shape, but let's use a Cylinder with open ends
+    // Actually, let's use the ConeGeometry we had but with more segments
+    const geometry = new THREE.CylinderGeometry(2, 10, 30, 64, 64, true);
+    geometry.translate(0, 5, 0); // Adjust pivot
+
+    const getMaterial = (color) => new THREE.ShaderMaterial({
+      fragmentShader,
+      vertexShader,
       uniforms: {
-        time: { value: 0 },
-        colorBase: { value: new THREE.Color(0xff4500) }, // OrangeRed
-        colorTip: { value: new THREE.Color(0xffff00) }   // Yellow
+        uAnimationProgress: { value: 0 },
+        uColor: { value: new THREE.Color(color) }
       },
-      vertexShader: `
-        uniform float time;
-        varying vec2 vUv;
-        varying float vNoise;
-
-        // Simplex Noise (simplified)
-        vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-        vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-        vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
-        vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
-        float snoise(vec3 v) {
-          const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
-          const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
-          vec3 i  = floor(v + dot(v, C.yyy) );
-          vec3 x0 = v - i + dot(i, C.xxx) ;
-          vec3 g = step(x0.yzx, x0.xyz);
-          vec3 l = 1.0 - g;
-          vec3 i1 = min( g.xyz, l.zxy );
-          vec3 i2 = max( g.xyz, l.zxy );
-          vec3 x1 = x0 - i1 + C.xxx;
-          vec3 x2 = x0 - i2 + C.yyy;
-          vec3 x3 = x0 - D.yyy;
-          i = mod289(i);
-          vec4 p = permute( permute( permute(
-                    i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-                  + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))
-                  + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
-          float n_ = 0.142857142857;
-          vec3  ns = n_ * D.wyz - D.xzx;
-          vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-          vec4 x_ = floor(j * ns.z);
-          vec4 y_ = floor(j - 7.0 * x_ );
-          vec4 x = x_ *ns.x + ns.yyyy;
-          vec4 y = y_ *ns.x + ns.yyyy;
-          vec4 h = 1.0 - abs(x) - abs(y);
-          vec4 b0 = vec4( x.xy, y.xy );
-          vec4 b1 = vec4( x.zw, y.zw );
-          vec4 s0 = floor(b0)*2.0 + 1.0;
-          vec4 s1 = floor(b1)*2.0 + 1.0;
-          vec4 sh = -step(h, vec4(0.0));
-          vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
-          vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
-          vec3 p0 = vec3(a0.xy,h.x);
-          vec3 p1 = vec3(a0.zw,h.y);
-          vec3 p2 = vec3(a1.xy,h.z);
-          vec3 p3 = vec3(a1.zw,h.w);
-          vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-          p0 *= norm.x;
-          p1 *= norm.y;
-          p2 *= norm.z;
-          p3 *= norm.w;
-          return 42.0 * dot( p0, p0 );
-        }
-
-        void main() {
-          vUv = uv;
-          
-          // Noise scrolling up
-          float noise = snoise(vec3(position.x * 0.2, position.y * 0.2 + time * 2.0, position.z * 0.2));
-          vNoise = noise;
-          
-          // Displace vertices
-          vec3 newPos = position + normal * noise * 2.0;
-          
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 colorBase;
-        uniform vec3 colorTip;
-        varying float vNoise;
-        varying vec2 vUv;
-
-        void main() {
-            // Mix colors based on UV y and noise
-            float t = vUv.y + vNoise * 0.2;
-            vec3 finalColor = mix(colorBase, colorTip, t);
-            
-            // Alpha fade at top and bottom
-            float alpha = smoothstep(0.0, 0.2, vUv.y) * (1.0 - smoothstep(0.8, 1.0, vUv.y));
-            
-            gl_FragColor = vec4(finalColor, alpha);
-        }
-      `,
-      side: THREE.DoubleSide,
       transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending
+      side: THREE.DoubleSide, // Simplified from the double-pass render
+      depthWrite: false, // Helps with transparency
+      blending: THREE.NormalBlending // Or Additive
     });
 
-    this.currentMesh = new THREE.Mesh(geometry, material);
+    const material1 = getMaterial(0xff0000); // Red
+    const material2 = getMaterial(0xffff00); // Yellow
+
+    const mesh1 = new THREE.Mesh(geometry, material1);
+
+    const mesh2 = new THREE.Mesh(geometry, material2);
+    mesh2.scale.set(0.8, 0.8, 0.8); // Smaller inner flame
+    mesh2.position.y = 0.5; // Slightly offset
+
+    this.currentMesh.add(mesh1);
+    this.currentMesh.add(mesh2);
+
     this.scene.add(this.currentMesh);
   }
 
@@ -379,7 +430,7 @@ export class MainScene {
       uniforms: {
         time: { value: 0 },
         colorBase: { value: new THREE.Color(0xffffff) }, // White
-        colorShadow: { value: new THREE.Color(0xaaaaaa) } // Gray
+        colorShadow: { value: new THREE.Color(0xccccff) } // Light Blue-ish Gray
       },
       vertexShader: `
         uniform float time;
@@ -456,7 +507,8 @@ export class MainScene {
         void main() {
             // Mix colors based on noise
             vec3 finalColor = mix(colorShadow, colorBase, vNoise * 0.5 + 0.5);
-            gl_FragColor = vec4(finalColor, 0.8);
+            // Increase opacity and add a bit of glow
+            gl_FragColor = vec4(finalColor, 0.9);
         }
       `,
       side: THREE.DoubleSide,
@@ -676,12 +728,29 @@ export class MainScene {
     const elapsed = this.clock.elapsedTime;
 
     // Update Current Mesh
-    if (this.currentMesh && this.currentMesh.material.uniforms && this.currentMesh.material.uniforms.time) {
-      this.currentMesh.material.uniforms.time.value = elapsed;
-      // Rotate slightly
-      this.currentMesh.rotation.y = elapsed * 0.2;
-    } else if (this.currentMesh) {
-      this.currentMesh.rotation.y = elapsed * 0.2;
+    if (this.currentMesh) {
+      // Handle Group (Fire)
+      if (this.currentMesh.isGroup) {
+        this.currentMesh.children.forEach(child => {
+          if (child.material.uniforms) {
+            if (child.material.uniforms.time) child.material.uniforms.time.value = elapsed;
+            if (child.material.uniforms.uAnimationProgress) {
+              // Cycle every 2 seconds
+              child.material.uniforms.uAnimationProgress.value = (Date.now() / 2000) % 1;
+            }
+          }
+        });
+        this.currentMesh.rotation.y = elapsed * 0.2;
+      }
+      // Handle Single Mesh
+      else if (this.currentMesh.material && this.currentMesh.material.uniforms) {
+        if (this.currentMesh.material.uniforms.time) {
+          this.currentMesh.material.uniforms.time.value = elapsed;
+        }
+        this.currentMesh.rotation.y = elapsed * 0.2;
+      } else {
+        this.currentMesh.rotation.y = elapsed * 0.2;
+      }
     }
 
     // Update Particles
