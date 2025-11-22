@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetY,
                 angle,
                 progress: 0,
-                speed: 0.001 + Math.random() * 0.002, // Slower speed (was 0.005+)
+                speed: 0.003 + Math.random() * 0.003,
                 offsetFreq: 0.05 + Math.random() * 0.05,
                 offsetAmp: 50 + Math.random() * 50,
                 phase: Math.random() * Math.PI * 2
