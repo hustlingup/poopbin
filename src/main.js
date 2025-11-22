@@ -14,6 +14,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentThemeColor = '#ffff00'; // Default yellow
 
+    // --- Particle Manager for Optimization ---
+    const particleManager = {
+        particles: [],
+        isRunning: false,
+
+        add(el, startX, startY, targetX, targetY, angle) {
+            this.particles.push({
+                el,
+                startX,
+                startY,
+                targetX,
+                targetY,
+                angle,
+                progress: 0,
+                speed: 0.001 + Math.random() * 0.002, // Slower speed (was 0.005+)
+                offsetFreq: 0.05 + Math.random() * 0.05,
+                offsetAmp: 50 + Math.random() * 50,
+                phase: Math.random() * Math.PI * 2
+            });
+
+            if (!this.isRunning) {
+                this.isRunning = true;
+                this.loop();
+            }
+        },
+
+        loop() {
+            if (this.particles.length === 0) {
+                this.isRunning = false;
+                return;
+            }
+
+            // Process backwards to allow safe removal
+            for (let i = this.particles.length - 1; i >= 0; i--) {
+                const p = this.particles[i];
+                p.progress += p.speed;
+
+                if (p.progress >= 1) {
+                    p.el.remove();
+                    // Trigger ripple on the 3D object
+                    if (cloud && cloud.triggerRipple) {
+                        cloud.triggerRipple(p.angle);
+                    }
+                    this.particles.splice(i, 1);
+                    continue;
+                }
+
+                // Linear interpolation
+                const currentX = p.startX + (p.targetX - p.startX) * p.progress;
+                const currentY = p.startY + (p.targetY - p.startY) * p.progress;
+
+                // Add fluid noise/wave
+                const wave = Math.sin(p.progress * Math.PI * 2 + p.phase);
+
+                // Perpendicular vector to path
+                const dx = p.targetX - p.startX;
+                const dy = p.targetY - p.startY;
+                const len = Math.sqrt(dx * dx + dy * dy);
+                const nx = -dy / len; // Normal X
+                const ny = dx / len;  // Normal Y
+
+                // Dampen amplitude as it gets closer to 1 to hit the target precisely
+                const amp = p.offsetAmp * (1 - p.progress);
+
+                const x = currentX + nx * wave * amp;
+                const y = currentY + ny * wave * amp;
+
+                p.el.style.left = `${x}px`;
+                p.el.style.top = `${y}px`;
+
+                // Absorption Effect (Gooey Merge)
+                if (p.progress > 0.85) {
+                    const absorbProgress = (p.progress - 0.85) / 0.15; // 0 to 1
+                    const scale = 1 - absorbProgress;
+                    p.el.style.transform = `scale(${scale})`;
+                    p.el.style.opacity = `${scale}`;
+                }
+            }
+
+            requestAnimationFrame(() => this.loop());
+        }
+    };
+
     if (colorsBtn) {
         colorsBtn.addEventListener('click', () => {
             // Random bright color using HSL
@@ -68,7 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Define "Surface" radius (approximate fire size)
         const surfaceRadius = 60;
 
-        for (let i = 0; i < 10; i++) {
+        // Reduced count to 3
+        for (let i = 0; i < 3; i++) {
             const p = document.createElement('div');
             p.classList.add('gooey-particle');
 
@@ -125,67 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetX = centerX + Math.cos(angle) * surfaceRadius;
             const targetY = centerY + Math.sin(angle) * surfaceRadius;
 
-            // Animate
-            animateParticle(p, startX, startY, targetX, targetY, angle);
+            // Add to manager instead of starting individual loop
+            particleManager.add(p, startX, startY, targetX, targetY, angle);
         }
-    }
-
-    function animateParticle(el, startX, startY, targetX, targetY, angle) {
-        let progress = 0;
-        const speed = 0.005 + Math.random() * 0.005; // Random speed
-
-        const offsetFreq = 0.05 + Math.random() * 0.05;
-        const offsetAmp = 50 + Math.random() * 50;
-        const phase = Math.random() * Math.PI * 2;
-
-        function loop() {
-            progress += speed;
-            if (progress >= 1) {
-                el.remove();
-                // Trigger ripple on the 3D object
-                if (cloud && cloud.triggerRipple) {
-                    cloud.triggerRipple(angle);
-                }
-                return;
-            }
-
-            // Linear interpolation
-            const currentX = startX + (targetX - startX) * progress;
-            const currentY = startY + (targetY - startY) * progress;
-
-            // Add fluid noise/wave
-            const wave = Math.sin(progress * Math.PI * 2 + phase);
-
-            // Perpendicular vector to path
-            const dx = targetX - startX;
-            const dy = targetY - startY;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            const nx = -dy / len;
-            const ny = dx / len;
-
-            // Dampen amplitude as it gets closer to 1 to hit the target precisely
-            const amp = offsetAmp * (1 - progress);
-
-            const x = currentX + nx * wave * amp;
-            const y = currentY + ny * wave * amp;
-
-            el.style.left = `${x}px`;
-            el.style.top = `${y}px`;
-
-            // Absorption Effect (Gooey Merge)
-            // Start shrinking/fading when close
-            if (progress > 0.85) {
-                const absorbProgress = (progress - 0.85) / 0.15; // 0 to 1
-                // Scale down
-                const scale = 1 - absorbProgress;
-                // Maybe stretch towards the center to look like being sucked in?
-                // For now, simple scale is good for gooey effect
-                el.style.transform = `scale(${scale})`;
-                el.style.opacity = `${scale}`;
-            }
-
-            requestAnimationFrame(loop);
-        }
-        loop();
     }
 });
