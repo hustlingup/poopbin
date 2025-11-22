@@ -32,31 +32,48 @@
         </button>
       </div>
     </nav>
-    <div id="global-counter-container">
-      국가 총 배설: <span id="global-counter">Loading...</span>
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+      <div id="local-counter" class="counter">0</div>
+
+      <div class="action-buttons">
+        <button id="btn-colors" class="icon-btn-large">
+          <img src="/icons/colors.png" alt="Colors" />
+        </button>
+        <button id="btn-change" class="icon-btn-large">
+          <img src="/icons/change.png" alt="Change" />
+        </button>
+        <button id="dump-btn">
+          <span class="btn-text">감정 배설</span>
+        </button>
+      </div>
+
+      <div id="global-counter-container">
+        국가 총 배설: <span id="global-counter">Loading...</span>
+      </div>
     </div>
-  </div>
 
-  <div id="particle-container"></div>
+    <div id="particle-container"></div>
 
-  <!-- Gooey Filter -->
-  <svg style="position: absolute; width: 0; height: 0; pointer-events: none;">
-    <defs>
-      <filter id="goo">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
-        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+    <!-- Gooey Filter -->
+    <svg style="position: absolute; width: 0; height: 0; pointer-events: none;">
+      <defs>
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
 
-        <!-- Specular Highlight -->
-        <feSpecularLighting in="blur" surfaceScale="5" specularConstant="1" specularExponent="20"
-          lighting-color="#ffffff" result="specular">
-          <fePointLight x="-5000" y="-10000" z="20000" />
-        </feSpecularLighting>
+          <!-- Specular Highlight -->
+          <feSpecularLighting in="blur" surfaceScale="5" specularConstant="1" specularExponent="20"
+            lighting-color="#ffffff" result="specular">
+            <fePointLight x="-5000" y="-10000" z="20000" />
+          </feSpecularLighting>
 
-        <feComposite in="specular" in2="goo" operator="in" result="specular" />
-        <feComposite in="SourceGraphic" in2="specular" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
-      </filter>
-    </defs>
-  </svg>
+          <feComposite in="specular" in2="goo" operator="in" result="specular" />
+          <feComposite in="SourceGraphic" in2="specular" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
+        </filter>
+      </defs>
+    </svg>
   </div>
   <script>
     if ('serviceWorker' in navigator) {
