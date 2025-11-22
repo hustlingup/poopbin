@@ -29,8 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentThemeColor = randomColor;
 
             // Update cloud
-            // if (cloud) cloud.updateColor(randomColor); // Removed
-
+            if (cloud) cloud.updateColor(randomColor);
 
             // Animate button
             gsap.to(colorsBtn, {
@@ -144,10 +143,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (progress >= 1) {
                 el.remove();
                 // Trigger ripple on the 3D object
-                // if (cloud && cloud.triggerRipple) {
-                //     cloud.triggerRipple(angle);
-                // }
-
+                if (cloud && cloud.triggerRipple) {
+                    cloud.triggerRipple(angle);
+                }
                 return;
             }
 
