@@ -1,11 +1,11 @@
 import './style.css';
-import { CloudScene } from './cloud.js';
+import { SlimeScene } from './slime.js';
 import { CounterManager } from './counter.js';
 import gsap from 'gsap';
 import * as THREE from 'three';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const cloud = new CloudScene('canvas-container');
+    const slime = new SlimeScene('canvas-container');
     const counters = new CounterManager();
 
     const dumpBtn = document.getElementById('dump-btn');
@@ -54,8 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (p.progress >= 1) {
                     p.el.remove();
                     // Trigger ripple on the 3D object
-                    if (cloud && cloud.triggerRipple) {
-                        cloud.triggerRipple(p.angle);
+                    if (slime && slime.triggerRipple) {
+                        slime.triggerRipple(p.angle);
                     }
                     this.particles.splice(i, 1);
                     continue;
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentThemeColor = randomColor;
 
             // Update cloud
-            if (cloud) cloud.updateColor(randomColor);
+            if (slime) slime.updateColor(randomColor);
 
             // Animate button
             gsap.to(colorsBtn, {

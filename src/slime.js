@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-export class CloudScene {
+export class SlimeScene {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
     if (!this.container) {
@@ -34,14 +34,14 @@ export class CloudScene {
     // Clock
     this.clock = new THREE.Clock();
 
-    this.initFire();
+    this.initSlime();
     // this.initParticles(); // Removed spark effect
     this.addEvents();
     this.animate();
   }
 
-  initFire() {
-    // 3D Fire Shader Material
+  initSlime() {
+    // 3D Slime Shader Material
     // Based on noise and displacement to mimic the reference
 
     const geometry = new THREE.SphereGeometry(15, 64, 64); // Reduced size 50%
@@ -172,12 +172,12 @@ export class CloudScene {
       transparent: true
     });
 
-    this.fireMesh = new THREE.Mesh(geometry, material);
-    this.scene.add(this.fireMesh);
+    this.slimeMesh = new THREE.Mesh(geometry, material);
+    this.scene.add(this.slimeMesh);
   }
 
   triggerRipple(angle) {
-    if (!this.fireMesh) return;
+    if (!this.slimeMesh) return;
 
     // Calculate impact point on the sphere surface
     // Sphere radius is 15.
@@ -192,7 +192,7 @@ export class CloudScene {
     const impactPos = new THREE.Vector3(x, y, z);
 
     // Find oldest ripple slot to overwrite
-    const uniforms = this.fireMesh.material.uniforms;
+    const uniforms = this.slimeMesh.material.uniforms;
     const ripples = uniforms.uRipples.value;
     const time = uniforms.time.value;
 
@@ -204,7 +204,7 @@ export class CloudScene {
   }
 
   updateColor(hexColor) {
-    if (!this.fireMesh) return;
+    if (!this.slimeMesh) return;
 
     const base = new THREE.Color(hexColor);
     const hsl = {};
@@ -219,7 +219,7 @@ export class CloudScene {
     // Core: Lighter, almost white
     const core = new THREE.Color().setHSL(hsl.h, hsl.s, Math.min(1, hsl.l + 0.4));
 
-    const uniforms = this.fireMesh.material.uniforms;
+    const uniforms = this.slimeMesh.material.uniforms;
     uniforms.colorOuter.value.copy(outer);
     uniforms.colorInner.value.copy(inner);
     uniforms.colorCore.value.copy(core);
@@ -308,11 +308,11 @@ export class CloudScene {
     const delta = this.clock.getDelta();
     const elapsed = this.clock.elapsedTime;
 
-    // Update Fire Mesh
-    if (this.fireMesh) {
-      this.fireMesh.material.uniforms.time.value = elapsed;
+    // Update Slime Mesh
+    if (this.slimeMesh) {
+      this.slimeMesh.material.uniforms.time.value = elapsed;
       // Rotate slightly
-      this.fireMesh.rotation.y = elapsed * 0.2;
+      this.slimeMesh.rotation.y = elapsed * 0.2;
     }
 
     // Update Particles

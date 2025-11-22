@@ -4,7 +4,7 @@ const ASSETS_TO_CACHE = [
     '/index.html',
     '/src/style.css',
     '/src/main.js',
-    '/src/cloud.js',
+    '/src/slime.js',
     '/src/particles.js',
     '/src/counter.js',
     '/manifest.json'
