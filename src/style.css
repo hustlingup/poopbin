@@ -171,6 +171,30 @@ body {
   transform: scale(0.95);
 }
 
+#btn-change {
+  background: var(--btn-black);
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#btn-change img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+#btn-change:active {
+  transform: scale(0.95);
+}
+
 #global-counter-container {
   font-size: 1rem;
   color: #555;

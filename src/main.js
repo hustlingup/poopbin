@@ -1,15 +1,16 @@
 import './style.css';
-import { SlimeScene } from './slime.js';
+import { MainScene } from './slime.js';
 import { CounterManager } from './counter.js';
 import gsap from 'gsap';
 import * as THREE from 'three';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const slime = new SlimeScene('canvas-container');
+    const mainScene = new MainScene('canvas-container');
     const counters = new CounterManager();
 
     const dumpBtn = document.getElementById('dump-btn');
     const colorsBtn = document.getElementById('btn-colors');
+    const changeBtn = document.getElementById('btn-change');
     const particleContainer = document.getElementById('particle-container');
 
     let currentThemeColor = '#ffff00'; // Default yellow
@@ -54,8 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (p.progress >= 1) {
                     p.el.remove();
                     // Trigger ripple on the 3D object
-                    if (slime && slime.triggerRipple) {
-                        slime.triggerRipple(p.angle);
+                    if (mainScene && mainScene.triggerRipple) {
+                        mainScene.triggerRipple(p.angle);
                     }
                     this.particles.splice(i, 1);
                     continue;
@@ -112,10 +113,27 @@ document.addEventListener('DOMContentLoaded', () => {
             currentThemeColor = randomColor;
 
             // Update cloud
-            if (slime) slime.updateColor(randomColor);
+            if (mainScene) mainScene.updateColor(randomColor);
 
             // Animate button
             gsap.to(colorsBtn, {
+                scale: 0.9,
+                yoyo: true,
+                repeat: 1,
+                duration: 0.1
+            });
+        });
+    }
+
+    if (changeBtn) {
+        changeBtn.addEventListener('click', () => {
+            if (mainScene) {
+                const newShape = mainScene.nextShape();
+                console.log('Switched to shape:', newShape);
+            }
+
+            // Animate button
+            gsap.to(changeBtn, {
                 scale: 0.9,
                 yoyo: true,
                 repeat: 1,
@@ -147,35 +165,66 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = btn.getBoundingClientRect();
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
-
-        // Define "Surface" radius (approximate fire size)
         const surfaceRadius = 60;
+        const currentShape = mainScene ? mainScene.currentShape : 'slime';
 
         // Reduced count to 3
         for (let i = 0; i < 3; i++) {
             const p = document.createElement('div');
             p.classList.add('gooey-particle');
 
-            // Random size 5px to 30px
-            const size = 5 + Math.random() * 25;
+            // Default Size
+            let size = 5 + Math.random() * 25;
+
+            // Shape specific styles
+            let color1, color2, color3;
+            let borderRadius = '50%';
+
+            if (currentShape === 'flower') {
+                // Petals: Pink/Red/Purple
+                color1 = '#ff69b4'; // HotPink
+                color2 = '#ff1493'; // DeepPink
+                color3 = '#da70d6'; // Orchid
+                borderRadius = '50% 0 50% 0'; // Petal shape
+                p.style.transform = `rotate(${Math.random() * 360}deg)`;
+            } else if (currentShape === 'fire') {
+                // Fire: Red/Orange/Yellow
+                color1 = '#ffff00';
+                color2 = '#ff4500';
+                color3 = '#ff0000';
+                borderRadius = '50% 50% 50% 0'; // Teardrop
+                size = 10 + Math.random() * 20;
+            } else if (currentShape === 'cloud') {
+                // Cloud: White/Gray
+                color1 = '#ffffff';
+                color2 = '#dddddd';
+                color3 = '#bbbbbb';
+                size = 20 + Math.random() * 30; // Larger puffs
+            } else if (currentShape === 'plasmaball') {
+                // Plasma: Cyan/Blue/White
+                color1 = '#ffffff';
+                color2 = '#00ffff';
+                color3 = '#0000ff';
+                size = 5 + Math.random() * 10; // Small sparks
+            } else {
+                // Slime (Default)
+                // Dynamic Gradient Color based on currentThemeColor
+                const base = new THREE.Color(currentThemeColor);
+                const hsl = {};
+                base.getHSL(hsl);
+                color1 = '#ffffff'; // Core
+                color2 = base.getStyle(); // Base
+                color3 = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.2)).getStyle(); // Darker
+            }
+
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
-
-            // Dynamic Gradient Color based on currentThemeColor
-            const base = new THREE.Color(currentThemeColor);
-            const hsl = {};
-            base.getHSL(hsl);
-
-            // Generate variations
-            const lighter = new THREE.Color().setHSL(hsl.h, hsl.s, Math.min(1, hsl.l + 0.1)).getStyle();
-            const darker = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.2)).getStyle();
-            const core = '#ffffff';
-            const baseStyle = base.getStyle();
+            p.style.borderRadius = borderRadius;
 
             const gradients = [
-                `radial-gradient(circle at 30% 30%, ${core} 0%, ${baseStyle} 20%, ${darker} 100%)`,
-                `radial-gradient(circle at 30% 30%, ${baseStyle} 0%, ${lighter} 40%, ${darker} 100%)`,
-                `radial-gradient(circle at 30% 30%, ${core} 10%, ${baseStyle} 30%, ${darker} 100%)`
+                `radial-gradient(circle at 30% 30%, ${color1} 0%, ${color2} 20%, ${color3} 100%)`,
+                `radial-gradient(circle at 30% 30%, ${color2} 0%, ${color1} 40%, ${color3} 100%)`,
+                `radial-gradient(circle at 30% 30%, ${color1} 10%, ${color2} 30%, ${color3} 100%)`
             ];
 
             const gradient = gradients[Math.floor(Math.random() * gradients.length)];
@@ -209,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetX = centerX + Math.cos(angle) * surfaceRadius;
             const targetY = centerY + Math.sin(angle) * surfaceRadius;
 
-            // Add to manager instead of starting individual loop
+            // Add to manager
             particleManager.add(p, startX, startY, targetX, targetY, angle);
         }
     }
